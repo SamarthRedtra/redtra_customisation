@@ -130,9 +130,9 @@ doctype_tree_js = {"Account" : "public/js/account_tree.js",
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"Purchase Order": "redtra_customisation.override.purchase_order.CustomPurchaseOrder"
+}
 
 # Document Events
 # ---------------
