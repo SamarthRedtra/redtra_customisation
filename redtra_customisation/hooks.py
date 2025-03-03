@@ -130,21 +130,24 @@ doctype_tree_js = {"Account" : "public/js/account_tree.js",
 # ---------------
 # Override standard doctype classes
 
-override_doctype_class = {
-	"Purchase Order": "redtra_customisation.override.purchase_order.CustomPurchaseOrder"
-}
+# override_doctype_class = {
+# 	"Purchase Order": "redtra_customisation.override.purchase_order.CustomPurchaseOrder"
+# }
 
 # Document Events
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	# "*": {
+	# 	"on_update": "method",
+	# 	"on_cancel": "method",
+	# 	"on_trash": "method"
+	# },
+ "Purchase Order": {
+    "on_update": "redtra_customisation.override.purchase_order.on_update_po"
+ }
+}
 
 # Scheduled Tasks
 # ---------------
