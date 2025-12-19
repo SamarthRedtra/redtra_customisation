@@ -16,6 +16,7 @@ class CustomPaymentEntry(PaymentEntry):
 	def validate(self):
 		super().validate()
 		self.validate_pdc_details()
+		self.validate_cheque_status_change()
 
 	def validate_pdc_details(self):
 		"""Validate PDC-related fields"""
@@ -32,6 +33,36 @@ class CustomPaymentEntry(PaymentEntry):
 		if getdate(self.pdc_cheque_date) > getdate(self.posting_date):
 			# Allow posting date to be set to cheque date for PDC
 			pass
+	
+	def validate_cheque_status_change(self):
+		"""Allow status changes after submission with proper workflow validation"""
+		if not self.is_cheque_payment() or self.docstatus != 1:
+			return
+		
+		# Get previous status from database if this is an update
+		if self.name and frappe.db.exists("Payment Entry", self.name):
+			old_status = frappe.db.get_value("Payment Entry", self.name, "pdc_cheque_status")
+			
+			# Allow status changes following proper workflow
+			valid_transitions = {
+				"Issued": ["Under Collection"],
+				"Under Collection": ["Collected", "Bounced", "Paid"],
+				"Collected": ["Bounced"],
+				"Paid": ["Bounced"],
+				"Bounced": []  # Terminal state, no transitions allowed
+			}
+			
+			if old_status and old_status != self.pdc_cheque_status:
+				allowed_next = valid_transitions.get(old_status, [])
+				if self.pdc_cheque_status not in allowed_next:
+					frappe.throw(_(
+						"Cannot change status from '{0}' to '{1}'. "
+						"Allowed transitions: {2}"
+					).format(
+						old_status, 
+						self.pdc_cheque_status,
+						", ".join(allowed_next) if allowed_next else "None (terminal state)"
+					))
 
 	def is_cheque_payment(self):
 		"""Check if payment mode is cheque"""

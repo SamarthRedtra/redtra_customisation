@@ -22,6 +22,23 @@ frappe.ui.form.on('Payment Entry', {
 				frm.set_value('posting_date', frm.doc.pdc_cheque_date);
 			}
 		}
+	},
+	
+	pdc_cheque_status: function(frm) {
+		// Allow status change after submission
+		if (frm.doc.docstatus === 1 && frm.doc.mode_of_payment && 
+			frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
+			// Field is now editable, validation happens on server side
+			// Just save when status changes
+			if (frm.is_dirty()) {
+				frm.save().then(() => {
+					frappe.show_alert({
+						message: __('Cheque status updated to {0}', [frm.doc.pdc_cheque_status]),
+						indicator: 'green'
+					});
+				});
+			}
+		}
 	}
 });
 
@@ -29,7 +46,16 @@ function setup_pdc_actions(frm) {
 	// Remove existing PDC buttons
 	frm.page.clear_custom_actions();
 	
-	// Add PDC workflow buttons based on status
+	// Make status field editable after submission
+	if (frm.doc.docstatus === 1 && frm.doc.mode_of_payment && 
+		frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
+		// Remove read-only restriction
+		if (frm.fields_dict.pdc_cheque_status) {
+			frm.set_df_property('pdc_cheque_status', 'read_only', 0);
+		}
+	}
+	
+	// Add PDC workflow buttons based on status (optional - users can also edit field directly)
 	if (frm.doc.docstatus === 1) { // Only for submitted entries
 		const status = frm.doc.pdc_cheque_status;
 		
