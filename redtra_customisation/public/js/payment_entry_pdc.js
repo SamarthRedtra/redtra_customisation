@@ -3,6 +3,7 @@ frappe.ui.form.on('Payment Entry', {
 		// Show/hide PDC actions based on cheque status
 		if (frm.doc.mode_of_payment && frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
 			setup_pdc_actions(frm);
+			setup_pdc_queries(frm);
 		}
 	},
 	
@@ -39,8 +40,37 @@ frappe.ui.form.on('Payment Entry', {
 				});
 			}
 		}
+	},
+	
+	pdc_bank_account: function(frm) {
+		// Validate that selected account is not a group account
+		if (frm.doc.pdc_bank_account) {
+			frappe.db.get_value('Account', frm.doc.pdc_bank_account, 'is_group', (r) => {
+				if (r && r.is_group) {
+					frappe.msgprint({
+						title: __('Invalid Account'),
+						message: __('Bank Account "{0}" is a Group Account. Please select a ledger account instead.', [frm.doc.pdc_bank_account]),
+						indicator: 'red'
+					});
+					frm.set_value('pdc_bank_account', '');
+				}
+			});
+		}
 	}
 });
+
+function setup_pdc_queries(frm) {
+	// Set query filter for bank account to exclude group accounts
+	frm.set_query('pdc_bank_account', function() {
+		return {
+			filters: {
+				is_group: 0,
+				company: frm.doc.company || '',
+				account_type: ['in', ['Bank', 'Cash']]
+			}
+		};
+	});
+}
 
 function setup_pdc_actions(frm) {
 	// Remove existing PDC buttons
