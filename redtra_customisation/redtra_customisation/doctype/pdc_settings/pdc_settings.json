@@ -1,0 +1,103 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-01-01 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "accounts_section",
+  "pdc_received_account",
+  "pdc_issued_account",
+  "under_collection_account",
+  "notification_section",
+  "send_reminders",
+  "reminder_days_before",
+  "reminder_days_after"
+ ],
+ "fields": [
+  {
+   "fieldname": "accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Accounts Configuration"
+  },
+  {
+   "fieldname": "pdc_received_account",
+   "fieldtype": "Link",
+   "label": "PDC Received Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pdc_issued_account",
+   "fieldtype": "Link",
+   "label": "PDC Issued Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "under_collection_account",
+   "fieldtype": "Link",
+   "label": "Under Collection Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "notification_section",
+   "fieldtype": "Section Break",
+   "label": "Notification Settings"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_reminders",
+   "fieldtype": "Check",
+   "label": "Send Reminders"
+  },
+  {
+   "default": "3",
+   "depends_on": "send_reminders",
+   "fieldname": "reminder_days_before",
+   "fieldtype": "Int",
+   "label": "Reminder Days Before Cheque Date"
+  },
+  {
+   "default": "5",
+   "depends_on": "send_reminders",
+   "fieldname": "reminder_days_after",
+   "fieldtype": "Int",
+   "label": "Reminder Days After Deposit Date"
+  }
+ ],
+ "idx": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Redtra Customisation",
+ "name": "PDC Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Accounts Manager",
+   "share": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

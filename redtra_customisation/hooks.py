@@ -26,7 +26,7 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/redtra_customisation/css/redtra_customisation.css"
-# app_include_js = "/assets/redtra_customisation/js/redtra_customisation.js"
+app_include_js = "/assets/redtra_customisation/js/list_view_fix.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/redtra_customisation/css/redtra_customisation.css"
@@ -44,6 +44,11 @@ app_license = "mit"
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+	"Payment Entry": "public/js/payment_entry_pdc.js",
+	"Customer": "public/js/customer_pdc_dashboard.js",
+	"Supplier": "public/js/supplier_pdc_dashboard.js"
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 doctype_tree_js = {"Account" : "public/js/account_tree.js",
@@ -84,7 +89,8 @@ doctype_tree_js = {"Account" : "public/js/account_tree.js",
 # ------------
 
 # before_install = "redtra_customisation.install.before_install"
-# after_install = "redtra_customisation.install.after_install"
+after_install = "redtra_customisation.pdc.install.after_install"
+after_migrate = "redtra_customisation.pdc.install.after_migrate"
 
 # Uninstallation
 # ------------
@@ -130,9 +136,10 @@ doctype_tree_js = {"Account" : "public/js/account_tree.js",
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"Purchase Order": "redtra_customisation.override.purchase_order.CustomPurchaseOrder"
-# }
+override_doctype_class = {
+	"BOM Creator": "redtra_customisation.override.bom_creator.CustomBOMCreator",
+	"Payment Entry": "redtra_customisation.pdc.payment_entry_override.CustomPaymentEntry"
+}
 
 # Document Events
 # ---------------
@@ -152,23 +159,11 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"redtra_customisation.tasks.all"
-# 	],
-# 	"daily": [
-# 		"redtra_customisation.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"redtra_customisation.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"redtra_customisation.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"redtra_customisation.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"redtra_customisation.pdc.notifications.send_pdc_reminders"
+	]
+}
 
 # Testing
 # -------
@@ -181,6 +176,12 @@ doc_events = {
 # override_whitelisted_methods = {
 # 	"frappe.desk.doctype.event.event.get_events": "redtra_customisation.event.get_events"
 # }
+
+# Whitelisted methods
+# -------------------
+# Methods that can be called from client-side
+
+# User import method is available via redtra_customisation.pdc.user_import.import_users_from_file
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
