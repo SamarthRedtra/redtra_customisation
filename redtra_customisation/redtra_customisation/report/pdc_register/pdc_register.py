@@ -1,20 +1,19 @@
-"""
-PDC Register Report
-"""
+# Copyright (c) 2025, samarth.upare@redtra.com and contributors
+# For license information, please see license.txt
 
 import frappe
 from frappe import _
-from frappe.query_builder.functions import Count, Sum
-from frappe.utils import getdate
 
 
-def execute(filters=None):
+def execute(filters: dict | None = None) -> tuple:
+	filters = frappe._dict(filters or {})
 	columns = get_columns()
 	data = get_data(filters)
+	
 	return columns, data
 
 
-def get_columns():
+def get_columns() -> list[dict]:
 	return [
 		{
 			"label": _("Payment Entry"),
@@ -83,7 +82,7 @@ def get_columns():
 	]
 
 
-def get_data(filters):
+def get_data(filters: dict | None = None) -> list[dict]:
 	"""Get PDC register data"""
 	# Build filters
 	filter_dict = {
@@ -99,15 +98,14 @@ def get_data(filters):
 		filter_dict["party"] = filters.party
 	if filters.get("status"):
 		filter_dict["pdc_cheque_status"] = filters.status
-	if filters.get("from_date"):
+	
+	# Handle date range
+	if filters.get("from_date") and filters.get("to_date"):
+		filter_dict["pdc_cheque_date"] = ["between", [filters.from_date, filters.to_date]]
+	elif filters.get("from_date"):
 		filter_dict["pdc_cheque_date"] = [">=", filters.from_date]
-	if filters.get("to_date"):
-		if "pdc_cheque_date" in filter_dict:
-			if isinstance(filter_dict["pdc_cheque_date"], list):
-				filter_dict["pdc_cheque_date"].append("<=")
-				filter_dict["pdc_cheque_date"].append(filters.to_date)
-		else:
-			filter_dict["pdc_cheque_date"] = ["<=", filters.to_date]
+	elif filters.get("to_date"):
+		filter_dict["pdc_cheque_date"] = ["<=", filters.to_date]
 	
 	# Get payment entries
 	data = frappe.get_all(
