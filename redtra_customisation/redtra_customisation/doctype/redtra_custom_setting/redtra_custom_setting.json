@@ -5,9 +5,25 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "skip_job_card_process",
+  "default_employee",
   "enble_purchase_reorder"
  ],
  "fields": [
+  {
+   "default": "0",
+   "fieldname": "skip_job_card_process",
+   "fieldtype": "Check",
+   "label": "Skip Job Card Process"
+  },
+  {
+   "depends_on": "eval:doc.skip_job_card_process",
+   "fieldname": "default_employee",
+   "fieldtype": "Link",
+   "label": "Default Employee",
+   "mandatory_depends_on": "eval:doc.skip_job_card_process",
+   "options": "Employee"
+  },
   {
    "default": "0",
    "fieldname": "enble_purchase_reorder",

@@ -153,6 +153,13 @@ doc_events = {
 	# },
  "Purchase Order": {
     "on_update": "redtra_customisation.override.purchase_order.on_update_po"
+},
+"Work Order": {
+    "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards",
+    "on_update_after_submit": "redtra_customisation.override.work_order.auto_complete_job_cards",
+ },
+ "Stock Entry": {
+    "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
  }
 }
 
@@ -246,4 +253,3 @@ scheduler_events = {
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
-
