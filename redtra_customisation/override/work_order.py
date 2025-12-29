@@ -66,6 +66,7 @@ def _submit_and_complete_job_card(job_card_name: str, employee: str) -> None:
 		job_card.transferred_qty = job_card.for_quantity
 
 	job_card.flags.ignore_permissions = True
+	job_card.flags.ignore_version = True
 	job_card.save()
 
 	if job_card.docstatus == 0:
