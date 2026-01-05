@@ -20,6 +20,7 @@ def execute():
     if custom_field_name:
         # Update allow_on_submit to 1
         frappe.db.set_value("Custom Field", custom_field_name, "allow_on_submit", 1)
+        frappe.db.set_value("Custom Field", custom_field_name, "read_only", "1")
         frappe.db.commit()
         print(f"Updated pdc_cheque_status field to allow changes after submit")
         

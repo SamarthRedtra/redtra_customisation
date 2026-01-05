@@ -45,7 +45,7 @@ PDC_CUSTOM_FIELDS = {
 			"insert_after": "pdc_bank_account",
 			"description": "Status of the cheque",
 			"allow_on_submit": 1,
-			"read_only_depends_on": "eval:doc.docstatus == 0",
+			"read_only": "1",
 		},
 		{
 			"fieldname": "pdc_cheque_details_section",
@@ -62,6 +62,7 @@ PDC_CUSTOM_FIELDS = {
 			"depends_on": "eval:doc.mode_of_payment && doc.mode_of_payment.toLowerCase().includes('cheque')",
 			"insert_after": "pdc_cheque_details_section",
 			"read_only": 1,
+			"allow_on_submit": 1,
 		},
 	]
 }

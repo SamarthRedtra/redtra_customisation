@@ -160,6 +160,13 @@ doc_events = {
  "Item": {
     "validate": "redtra_customisation.redtra_customisation.service_item_validator.validate_item_accounts",
     "before_save": "redtra_customisation.redtra_customisation.service_item_validator.before_save_item_accounts"
+},
+"Work Order": {
+    "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards",
+    "on_update_after_submit": "redtra_customisation.override.work_order.auto_complete_job_cards",
+ },
+ "Stock Entry": {
+    "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
  }
 }
 
@@ -253,4 +260,3 @@ scheduler_events = {
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
-
