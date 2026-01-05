@@ -26,7 +26,10 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/redtra_customisation/css/redtra_customisation.css"
-app_include_js = "/assets/redtra_customisation/js/list_view_fix.js"
+app_include_js = [
+	"/assets/redtra_customisation/js/list_view_fix.js",
+	"/assets/redtra_customisation/js/company_navbar_display.js"
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/redtra_customisation/css/redtra_customisation.css"
@@ -153,6 +156,10 @@ doc_events = {
 	# },
  "Purchase Order": {
     "on_update": "redtra_customisation.override.purchase_order.on_update_po"
+ },
+ "Item": {
+    "validate": "redtra_customisation.redtra_customisation.service_item_validator.validate_item_accounts",
+    "before_save": "redtra_customisation.redtra_customisation.service_item_validator.before_save_item_accounts"
  }
 }
 

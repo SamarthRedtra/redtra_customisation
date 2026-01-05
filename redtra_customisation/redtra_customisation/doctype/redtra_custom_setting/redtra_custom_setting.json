@@ -5,7 +5,9 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "enble_purchase_reorder"
+  "enble_purchase_reorder",
+  "service_item_section",
+  "service_item_account_mandatory"
  ],
  "fields": [
   {
@@ -13,6 +15,18 @@
    "fieldname": "enble_purchase_reorder",
    "fieldtype": "Check",
    "label": "Enble Purchase Reorder"
+  },
+  {
+   "fieldname": "service_item_section",
+   "fieldtype": "Section Break",
+   "label": "Service Item Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "service_item_account_mandatory",
+   "fieldtype": "Check",
+   "label": "Service Item Account Mandatory",
+   "description": "Enforce expense or income account selection for non-stock, non-asset items"
   }
  ],
  "index_web_pages_for_search": 1,
