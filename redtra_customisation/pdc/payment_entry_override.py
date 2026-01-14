@@ -230,8 +230,6 @@ class CustomPaymentEntry(PaymentEntry):
 			je.append("accounts", {
 				"account": bank_account,
 				"credit_in_account_currency": amount,
-				"party_type": self.party_type,
-				"party": self.party,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
 			})
