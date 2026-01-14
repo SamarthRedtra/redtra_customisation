@@ -136,8 +136,6 @@ class CustomPaymentEntry(PaymentEntry):
 			je.append("accounts", {
 				"account": pdc_settings.under_collection_account,
 				"debit_in_account_currency": amount,
-				"party_type": self.party_type,
-				"party": self.party,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
 			})
@@ -163,8 +161,6 @@ class CustomPaymentEntry(PaymentEntry):
 			je.append("accounts", {
 				"account": pdc_settings.under_collection_account,
 				"credit_in_account_currency": amount,
-				"party_type": self.party_type,
-				"party": self.party,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
 			})
@@ -219,8 +215,6 @@ class CustomPaymentEntry(PaymentEntry):
 			je.append("accounts", {
 				"account": pdc_settings.under_collection_account,
 				"credit_in_account_currency": amount,
-				"party_type": self.party_type,
-				"party": self.party,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
 			})
@@ -230,8 +224,6 @@ class CustomPaymentEntry(PaymentEntry):
 			je.append("accounts", {
 				"account": pdc_settings.under_collection_account,
 				"debit_in_account_currency": amount,
-				"party_type": self.party_type,
-				"party": self.party,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
 			})
