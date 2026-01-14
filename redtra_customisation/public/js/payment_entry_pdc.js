@@ -3,7 +3,6 @@ frappe.ui.form.on('Payment Entry', {
 		// Show/hide PDC actions based on cheque status
 		if (frm.doc.mode_of_payment && frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
 			setup_pdc_actions(frm);
-			setup_pdc_queries(frm);
 		}
 	},
 	
@@ -23,69 +22,14 @@ frappe.ui.form.on('Payment Entry', {
 				frm.set_value('posting_date', frm.doc.pdc_cheque_date);
 			}
 		}
-	},
-	
-	pdc_cheque_status: function(frm) {
-		// Allow status change after submission
-		if (frm.doc.docstatus === 1 && frm.doc.mode_of_payment && 
-			frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
-			// Field is now editable, validation happens on server side
-			// Just save when status changes
-			if (frm.is_dirty()) {
-				frm.save().then(() => {
-					frappe.show_alert({
-						message: __('Cheque status updated to {0}', [frm.doc.pdc_cheque_status]),
-						indicator: 'green'
-					});
-				});
-			}
-		}
-	},
-	
-	pdc_bank_account: function(frm) {
-		// Validate that selected account is not a group account
-		if (frm.doc.pdc_bank_account) {
-			frappe.db.get_value('Account', frm.doc.pdc_bank_account, 'is_group', (r) => {
-				if (r && r.is_group) {
-					frappe.msgprint({
-						title: __('Invalid Account'),
-						message: __('Bank Account "{0}" is a Group Account. Please select a ledger account instead.', [frm.doc.pdc_bank_account]),
-						indicator: 'red'
-					});
-					frm.set_value('pdc_bank_account', '');
-				}
-			});
-		}
 	}
 });
-
-function setup_pdc_queries(frm) {
-	// Set query filter for bank account to exclude group accounts
-	frm.set_query('pdc_bank_account', function() {
-		return {
-			filters: {
-				is_group: 0,
-				company: frm.doc.company || '',
-				account_type: ['in', ['Bank', 'Cash']]
-			}
-		};
-	});
-}
 
 function setup_pdc_actions(frm) {
 	// Remove existing PDC buttons
 	frm.page.clear_custom_actions();
 	
-	// Make status field editable after submission
-	if (frm.doc.docstatus === 1 && frm.doc.mode_of_payment && 
-		frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
-		// Remove read-only restriction
-		if (frm.fields_dict.pdc_cheque_status) {
-			frm.set_df_property('pdc_cheque_status', 'read_only', 0);
-		}
-	}
-	
-	// Add PDC workflow buttons based on status (optional - users can also edit field directly)
+	// Add PDC workflow buttons based on status
 	if (frm.doc.docstatus === 1) { // Only for submitted entries
 		const status = frm.doc.pdc_cheque_status;
 		
