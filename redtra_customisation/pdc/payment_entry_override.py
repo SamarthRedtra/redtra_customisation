@@ -144,6 +144,11 @@ class CustomPaymentEntry(PaymentEntry):
 		je.posting_date = nowdate()
 		je.company = self.company
 		je.user_remark = f"PDC Under Collection - {self.name} - Cheque: {self.pdc_cheque_number}"
+		
+		if self.payment_type == "Pay":
+			je.custom_is_pdc_pay = 1
+		else:
+			je.custom_is_pdc_receive = 1
 
 		amount = self.paid_amount if self.payment_type == "Pay" else self.received_amount
 
@@ -214,6 +219,11 @@ class CustomPaymentEntry(PaymentEntry):
 		je.posting_date = nowdate()
 		je.company = self.company
 		je.user_remark = f"PDC Collected - {self.name} - Cheque: {self.pdc_cheque_number}"
+
+		if self.payment_type == "Pay":
+			je.custom_is_pdc_pay = 1
+		else:
+			je.custom_is_pdc_receive = 1
 
 		amount = self.paid_amount if self.payment_type == "Pay" else self.received_amount
 		bank_account = self.pdc_bank_account or self.paid_to if self.payment_type == "Receive" else self.paid_from
@@ -294,6 +304,11 @@ class CustomPaymentEntry(PaymentEntry):
 		reverse_je = frappe.copy_doc(original_je)
 		reverse_je.posting_date = nowdate()
 		reverse_je.user_remark = f"PDC Bounced - Reversal - {self.name} - Cheque: {self.pdc_cheque_number}"
+		
+		if self.payment_type == "Pay":
+			reverse_je.custom_is_pdc_pay = 1
+		else:
+			reverse_je.custom_is_pdc_receive = 1
 		
 		# Reverse the amounts
 		for account in reverse_je.accounts:
