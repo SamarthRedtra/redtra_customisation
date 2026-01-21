@@ -114,7 +114,11 @@ class CustomPaymentEntry(PaymentEntry):
 
 		# Set initial status only on new records
 		if self.is_new() and self.is_cheque_payment() and not self.pdc_cheque_status:
-			self.pdc_cheque_status = "Issued"
+			custom_settings = frappe.get_single("Redtra Custom Setting")
+			if custom_settings.create_pdc_directly_under_collection:
+				self.pdc_cheque_status = "Under Collection"
+			else:
+				self.pdc_cheque_status = "Issued"
 
 	def on_submit(self):
 		super().on_submit()
@@ -123,33 +127,46 @@ class CustomPaymentEntry(PaymentEntry):
 
 	def create_initial_pdc_entry(self):
 		"""Create initial PDC accounting entry"""
-		if self.pdc_cheque_status != "Issued":
+		if self.pdc_cheque_status not in ["Issued", "Under Collection"]:
 			return
 
 		# Get PDC accounts from settings
 		pdc_settings = frappe.get_single("PDC Settings")
+		custom_settings = frappe.get_single("Redtra Custom Setting")
 		
-		if self.payment_type == "Receive":
-			# For received cheques: Debit PDC Received, Credit AR
-			# This is already handled by Payment Entry, just verify accounts
-			if self.paid_from != pdc_settings.pdc_received_account:
-				frappe.msgprint(_(
-					"Please ensure Paid From account is set to PDC Received Account "
-					"for cheque payments"
-				), alert=True)
+		# Determine which account to check against
+		if custom_settings.create_pdc_directly_under_collection:
+			target_account = pdc_settings.under_collection_account
+			account_label = "Under Collection Account"
 		else:
-			# For issued cheques: Credit PDC Issued, Debit AP
-			if self.paid_to != pdc_settings.pdc_issued_account:
+			target_account = pdc_settings.pdc_received_account if self.payment_type == "Receive" else pdc_settings.pdc_issued_account
+			account_label = "PDC Received Account" if self.payment_type == "Receive" else "PDC Issued Account"
+
+		if self.payment_type == "Receive":
+			# For received cheques: Debit Check Account, Credit AR
+			if self.paid_from != target_account:
 				frappe.msgprint(_(
-					"Please ensure Paid To account is set to PDC Issued Account "
+					"Please ensure Paid From account is set to {0} "
 					"for cheque payments"
-				), alert=True)
+				).format(account_label), alert=True)
+		else:
+			# For issued cheques: Credit Check Account, Debit AP
+			if self.paid_to != target_account:
+				frappe.msgprint(_(
+					"Please ensure Paid To account is set to {0} "
+					"for cheque payments"
+				).format(account_label), alert=True)
+		
+		if custom_settings.create_pdc_directly_under_collection:
+			self.pdc_cheque_status = "Issued"
+			self.mark_under_collection()
+			
 
 		# Add initial entry to cheque details
 		if not self.pdc_cheque_details:
 			self.append("pdc_cheque_details", {
 				"journal_entry": "",
-				"stage": "Issued",
+				"stage": self.pdc_cheque_status,
 				"date": self.posting_date,
 				"amount": self.paid_amount if self.payment_type == "Pay" else self.received_amount
 			})
