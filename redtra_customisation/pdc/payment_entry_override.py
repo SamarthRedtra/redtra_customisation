@@ -16,7 +16,6 @@ class CustomPaymentEntry(PaymentEntry):
 	def validate(self):
 		super().validate()
 		self.validate_pdc_details()
-		self.validate_cheque_status_change()
 
 	def validate_pdc_details(self):
 		"""Validate PDC-related fields"""
@@ -29,58 +28,11 @@ class CustomPaymentEntry(PaymentEntry):
 		if not self.pdc_cheque_date:
 			frappe.throw(_("Cheque Date is mandatory for cheque payments"))
 
-		# Validate bank account is not a group account
-		if self.pdc_bank_account:
-			self.validate_account_not_group(self.pdc_bank_account, "PDC Bank Account")
-
 		# For post-dated cheques, set posting date to cheque date
 		if getdate(self.pdc_cheque_date) > getdate(self.posting_date):
 			# Allow posting date to be set to cheque date for PDC
 			pass
-	
-	def validate_cheque_status_change(self):
-		"""Allow status changes after submission with proper workflow validation"""
-		if not self.is_cheque_payment() or self.docstatus != 1:
-			return
-		
-		# Get previous status from database if this is an update
-		if self.name and frappe.db.exists("Payment Entry", self.name):
-			old_status = frappe.db.get_value("Payment Entry", self.name, "pdc_cheque_status")
-			
-			# Allow status changes following proper workflow
-			valid_transitions = {
-				"Issued": ["Under Collection"],
-				"Under Collection": ["Collected", "Bounced", "Paid"],
-				"Collected": ["Bounced"],
-				"Paid": ["Bounced"],
-				"Bounced": []  # Terminal state, no transitions allowed
-			}
-			
-			if old_status and old_status != self.pdc_cheque_status:
-				allowed_next = valid_transitions.get(old_status, [])
-				if self.pdc_cheque_status not in allowed_next:
-					frappe.throw(_(
-						"Cannot change status from '{0}' to '{1}'. "
-						"Allowed transitions: {2}"
-					).format(
-						old_status, 
-						self.pdc_cheque_status,
-						", ".join(allowed_next) if allowed_next else "None (terminal state)"
-					))
 
-	def validate_account_not_group(self, account_name, account_label=""):
-		"""Validate that account is not a group account"""
-		if not account_name:
-			return
-		
-		is_group = frappe.db.get_value("Account", account_name, "is_group")
-		if is_group:
-			label = account_label or account_name
-			frappe.throw(_(
-				"Account {0} is a Group Account and group accounts cannot be used in transactions. "
-				"Please select a ledger account."
-			).format(frappe.bold(label)))
-	
 	def is_cheque_payment(self):
 		"""Check if payment mode is cheque"""
 		if not self.mode_of_payment:
@@ -179,8 +131,6 @@ class CustomPaymentEntry(PaymentEntry):
 		if self.pdc_cheque_status not in ["Issued"]:
 			frappe.throw(_("Cheque status must be 'Issued' to mark as Under Collection"))
 
-		# Allow updating cheque details table after submit
-		self.flags.ignore_validate_update_after_submit = True
 		self.create_collection_journal_entry()
 		self.pdc_cheque_status = "Under Collection"
 		self.save()
@@ -190,13 +140,6 @@ class CustomPaymentEntry(PaymentEntry):
 		"""Create Journal Entry to move from PDC account to Under Collection"""
 		pdc_settings = frappe.get_single("PDC Settings")
 		
-		# Validate all accounts are not group accounts
-		self.validate_account_not_group(pdc_settings.under_collection_account, "Under Collection Account")
-		if self.payment_type == "Receive":
-			self.validate_account_not_group(pdc_settings.pdc_received_account, "PDC Received Account")
-		else:
-			self.validate_account_not_group(pdc_settings.pdc_issued_account, "PDC Issued Account")
-		
 		je = frappe.new_doc("Journal Entry")
 		je.posting_date = nowdate()
 		je.company = self.company
@@ -204,28 +147,20 @@ class CustomPaymentEntry(PaymentEntry):
 
 		amount = self.paid_amount if self.payment_type == "Pay" else self.received_amount
 
-		# Check account type to determine if party is required
-		under_collection_account_type = frappe.db.get_value("Account", pdc_settings.under_collection_account, "account_type")
-		requires_party = under_collection_account_type in ["Receivable", "Payable"]
-
 		if self.payment_type == "Receive":
 			# Debit: Under Collection Account
 			# Credit: PDC Received Account
-			under_collection_entry = {
+			je.append("accounts", {
 				"account": pdc_settings.under_collection_account,
 				"debit_in_account_currency": amount,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
-			}
-			# Add party fields only if account type requires it
-			if requires_party and self.party_type and self.party:
-				under_collection_entry["party_type"] = self.party_type
-				under_collection_entry["party"] = self.party
-			
-			je.append("accounts", under_collection_entry)
+			})
 			je.append("accounts", {
 				"account": pdc_settings.pdc_received_account,
 				"credit_in_account_currency": amount,
+				"party_type": self.party_type,
+				"party": self.party,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
 			})
@@ -235,22 +170,17 @@ class CustomPaymentEntry(PaymentEntry):
 			je.append("accounts", {
 				"account": pdc_settings.pdc_issued_account,
 				"debit_in_account_currency": amount,
+				"party_type": self.party_type,
+				"party": self.party,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
 			})
-			
-			under_collection_entry = {
+			je.append("accounts", {
 				"account": pdc_settings.under_collection_account,
 				"credit_in_account_currency": amount,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
-			}
-			# Add party fields only if account type requires it
-			if requires_party and self.party_type and self.party:
-				under_collection_entry["party_type"] = self.party_type
-				under_collection_entry["party"] = self.party
-			
-			je.append("accounts", under_collection_entry)
+			})
 
 		je.insert()
 		je.submit()
@@ -271,8 +201,6 @@ class CustomPaymentEntry(PaymentEntry):
 		if self.pdc_cheque_status not in ["Under Collection"]:
 			frappe.throw(_("Cheque status must be 'Under Collection' to mark as Collected"))
 
-		# Allow updating cheque details table after submit
-		self.flags.ignore_validate_update_after_submit = True
 		self.create_clearance_journal_entry()
 		self.pdc_cheque_status = "Collected" if self.payment_type == "Receive" else "Paid"
 		self.save()
@@ -282,87 +210,46 @@ class CustomPaymentEntry(PaymentEntry):
 		"""Create Journal Entry to move from Under Collection to Bank"""
 		pdc_settings = frappe.get_single("PDC Settings")
 		
-		amount = self.paid_amount if self.payment_type == "Pay" else self.received_amount
-		bank_account = self.pdc_bank_account or self.paid_to if self.payment_type == "Receive" else self.paid_from
-		
-		# Validate all accounts are not group accounts
-		# Provide specific field name in error message
-		if self.pdc_bank_account:
-			self.validate_account_not_group(bank_account, "PDC Bank Account")
-		else:
-			# If using fallback account, validate it and mention which field to set
-			fallback_field = "Paid To" if self.payment_type == "Receive" else "Paid From"
-			if not bank_account:
-				frappe.throw(_("Please set PDC Bank Account or ensure {0} account is selected").format(fallback_field))
-			# Check if fallback account is group, but suggest setting PDC Bank Account
-			is_group = frappe.db.get_value("Account", bank_account, "is_group")
-			if is_group:
-				frappe.throw(_(
-					"The {0} account ({1}) is a Group Account. "
-					"Please set a ledger account in the 'PDC Bank Account' field instead."
-				).format(fallback_field, frappe.bold(bank_account)))
-		
-		self.validate_account_not_group(pdc_settings.under_collection_account, "Under Collection Account")
-		
 		je = frappe.new_doc("Journal Entry")
 		je.posting_date = nowdate()
 		je.company = self.company
 		je.user_remark = f"PDC Collected - {self.name} - Cheque: {self.pdc_cheque_number}"
 
-		# Check account types to determine if party is required
-		under_collection_account_type = frappe.db.get_value("Account", pdc_settings.under_collection_account, "account_type")
-		bank_account_type = frappe.db.get_value("Account", bank_account, "account_type")
-		under_collection_requires_party = under_collection_account_type in ["Receivable", "Payable"]
-		bank_requires_party = bank_account_type in ["Receivable", "Payable"]
+		amount = self.paid_amount if self.payment_type == "Pay" else self.received_amount
+		bank_account = self.pdc_bank_account or self.paid_to if self.payment_type == "Receive" else self.paid_from
 
 		if self.payment_type == "Receive":
 			# Debit: Bank Account
 			# Credit: Under Collection Account
-			bank_entry = {
+			je.append("accounts", {
 				"account": bank_account,
 				"debit_in_account_currency": amount,
+				"party_type": self.party_type,
+				"party": self.party,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
-			}
-			if bank_requires_party and self.party_type and self.party:
-				bank_entry["party_type"] = self.party_type
-				bank_entry["party"] = self.party
-			je.append("accounts", bank_entry)
-			
-			under_collection_entry = {
+			})
+			je.append("accounts", {
 				"account": pdc_settings.under_collection_account,
 				"credit_in_account_currency": amount,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
-			}
-			if under_collection_requires_party and self.party_type and self.party:
-				under_collection_entry["party_type"] = self.party_type
-				under_collection_entry["party"] = self.party
-			je.append("accounts", under_collection_entry)
+			})
 		else:
 			# Debit: Under Collection Account
 			# Credit: Bank Account
-			under_collection_entry = {
+			je.append("accounts", {
 				"account": pdc_settings.under_collection_account,
 				"debit_in_account_currency": amount,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
-			}
-			if under_collection_requires_party and self.party_type and self.party:
-				under_collection_entry["party_type"] = self.party_type
-				under_collection_entry["party"] = self.party
-			je.append("accounts", under_collection_entry)
-			
-			bank_entry = {
+			})
+			je.append("accounts", {
 				"account": bank_account,
 				"credit_in_account_currency": amount,
 				"reference_type": "Payment Entry",
 				"reference_name": self.name,
-			}
-			if bank_requires_party and self.party_type and self.party:
-				bank_entry["party_type"] = self.party_type
-				bank_entry["party"] = self.party
-			je.append("accounts", bank_entry)
+			})
 
 		je.insert()
 		je.submit()
@@ -383,8 +270,6 @@ class CustomPaymentEntry(PaymentEntry):
 		if self.pdc_cheque_status not in ["Under Collection", "Collected", "Paid"]:
 			frappe.throw(_("Cannot mark bounced. Cheque must be Under Collection, Collected, or Paid"))
 
-		# Allow updating cheque details table after submit
-		self.flags.ignore_validate_update_after_submit = True
 		self.reverse_collection_entry()
 		self.pdc_cheque_status = "Bounced"
 		self.save()
