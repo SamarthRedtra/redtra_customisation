@@ -170,6 +170,9 @@ doc_events = {
  },
  "Sales Invoice": {
     "validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
+ },
+ "Sales Person": {
+    "validate": "redtra_customisation.redtra_customisation.custom.sales_person.validate_slabs"
  }
 }
 
