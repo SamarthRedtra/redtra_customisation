@@ -167,6 +167,9 @@ doc_events = {
  },
  "Stock Entry": {
     "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
+ },
+ "Sales Invoice": {
+    "validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
  }
 }
 
