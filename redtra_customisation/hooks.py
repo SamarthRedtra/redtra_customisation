@@ -28,7 +28,8 @@ app_license = "mit"
 # app_include_css = "/assets/redtra_customisation/css/redtra_customisation.css"
 app_include_js = [
 	"/assets/redtra_customisation/js/list_view_fix.js",
-	"/assets/redtra_customisation/js/company_navbar_display.js"
+	"/assets/redtra_customisation/js/company_navbar_display.js",
+	"/assets/redtra_customisation/js/date_session_override.js"
 ]
 
 # include js, css files in header of web template
