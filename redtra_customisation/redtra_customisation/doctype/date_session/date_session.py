@@ -3,6 +3,8 @@
 
 import frappe
 from frappe.model.document import Document
+from frappe import _
+from frappe.utils import getdate
 
 
 class DateSession(Document):
@@ -53,3 +55,21 @@ def get_date_fields(doctype):
 				"fieldtype": df.fieldtype,
 			})
 	return fields
+
+
+@frappe.whitelist()
+def set_active_date_session(session_date):
+	"""Set session date and activate Date Session from navbar action."""
+	if not frappe.has_permission("Date Session", "write"):
+		frappe.throw(_("Not permitted to update Date Session"), frappe.PermissionError)
+
+	if not session_date:
+		frappe.throw(_("Session Date is required."))
+
+	doc = frappe.get_single("Date Session")
+	doc.is_active = 1
+	doc.session_date = getdate(session_date)
+	doc.save()
+
+	# Return updated payload expected by client-side override script.
+	return get_active_date_session()
