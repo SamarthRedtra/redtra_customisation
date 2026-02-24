@@ -37,8 +37,16 @@ def calculate_profit_percentage(doc):
 			(profit_amount / total_base_amount) * 100.0,
 			_get_currency_precision(),
 		)
+		if total_buying_amount > 0:
+			doc.custom_profit_markup_percentage_ = flt(
+				(profit_amount / total_buying_amount) * 100.0,
+				_get_currency_precision(),
+			)
+		else:
+			doc.custom_profit_markup_percentage_ = 100.0
 	else:
 		doc.custom_profit_percentage = 0.0
+		doc.custom_profit_markup_percentage_ = 0.0
 
 
 def _get_currency_precision():
@@ -338,6 +346,14 @@ def _fallback_profit_calculation(doc):
 	doc.custom_profit_percentage = (
 		(profit_amount / total_sales_amount) * 100.0 if total_sales_amount > 0 else 0.0
 	)
+	
+	if total_sales_amount > 0:
+		if total_buying_amount > 0:
+			doc.custom_profit_markup_percentage_ = (profit_amount / total_buying_amount) * 100.0
+		else:
+			doc.custom_profit_markup_percentage_ = 100.0
+	else:
+		doc.custom_profit_markup_percentage_ = 0.0
 
 
 def calculate_commission(doc):
@@ -347,27 +363,44 @@ def calculate_commission(doc):
 	if not doc.sales_team:
 		return
 
+	# Fetch the custom commission setting
+	settings = frappe.get_cached_doc("Redtra Custom Setting")
+	use_markup_for_slabs = getattr(settings, "use_markup_percentage_for_commission", 0)
+
 	profit_percentage = flt(doc.custom_profit_percentage)
+	markup_percentage = flt(doc.custom_profit_markup_percentage_)
+	
+	# Evaluate basis for percentage comparison
+	comparison_percentage = markup_percentage if use_markup_for_slabs else profit_percentage
+	
+	is_sales_based = getattr(doc, "custom_enable_sales_based", 0)
+	customer_commission = 0.0
+	if is_sales_based and doc.customer:
+		customer_commission = flt(frappe.db.get_value("Customer", doc.customer, "custom_comission"))
+		
 	sales_person_cache = {}
 
 	for row in doc.sales_team:
-		if row.sales_person not in sales_person_cache:
-			sales_person_cache[row.sales_person] = frappe.get_cached_doc(
-				"Sales Person", row.sales_person
-			)
-		sales_person_doc = sales_person_cache[row.sales_person]
-
-		if sales_person_doc.custom_enable_slab and sales_person_doc.custom_slabs:
+		if is_sales_based:
+			commission_rate = customer_commission
+		else:
+			if row.sales_person not in sales_person_cache:
+				sales_person_cache[row.sales_person] = frappe.get_cached_doc(
+					"Sales Person", row.sales_person
+				)
+			sales_person_doc = sales_person_cache[row.sales_person]
+	
 			commission_rate = 0.0
-			for slab in sales_person_doc.custom_slabs:
-				if flt(slab.get("from")) <= profit_percentage <= flt(slab.get("to")):
-					commission_rate = flt(slab.get("value"))
-					break
+			if sales_person_doc.custom_enable_slab and sales_person_doc.custom_slabs:
+				for slab in sales_person_doc.custom_slabs:
+					if flt(slab.get("from")) <= comparison_percentage <= flt(slab.get("to")):
+						commission_rate = flt(slab.get("value"))
+						break
 
-			row.commission_rate = commission_rate
-			base_amount = (
-				flt(row.allocated_amount)
-				if flt(row.allocated_amount) > 0
-				else flt(doc.base_net_total)
-			)
-			row.incentives = base_amount * (commission_rate / 100.0)
+		row.commission_rate = commission_rate
+		base_amount = (
+			flt(row.allocated_amount)
+			if flt(row.allocated_amount) > 0
+			else flt(doc.base_net_total)
+		)
+		row.incentives = base_amount * (commission_rate / 100.0)

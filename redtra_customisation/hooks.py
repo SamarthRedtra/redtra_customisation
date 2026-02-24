@@ -183,7 +183,8 @@ doc_events = {
 
 scheduler_events = {
 	"daily": [
-		"redtra_customisation.pdc.notifications.send_pdc_reminders"
+		"redtra_customisation.pdc.notifications.send_pdc_reminders",
+		"redtra_customisation.redtra_customisation.custom.customer_commission.update_customer_commissions"
 	]
 }
 
