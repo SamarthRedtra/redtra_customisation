@@ -27,9 +27,11 @@ def calculate_profit_percentage(doc):
 		gross_profit_data = _get_gross_profit_for_invoice(doc)
 		if gross_profit_data:
 			total_base_amount, total_buying_amount = gross_profit_data
-	except Exception:
-		_fallback_profit_calculation(doc)
-		return
+	except Exception as e:
+		frappe.log_error(f"Profit calculation failed: {e}", "Redtra Customisation")
+		pass # Proceed with defaults (0)
+
+
 
 	if total_base_amount > 0:
 		profit_amount = total_base_amount - total_buying_amount
@@ -308,52 +310,6 @@ class _DocGrossProfitGenerator:
 			new_list.append(header)
 			new_list.extend(rows)
 		self.si_list = new_list
-
-
-def _fallback_profit_calculation(doc):
-	"""
-	Fallback when GrossProfitGenerator fails (e.g. missing data).
-	Uses valuation rate from item/delivery note.
-	"""
-	total_buying_amount = 0.0
-	total_sales_amount = flt(doc.base_net_total)
-
-	for item in doc.items:
-		valuation_rate = 0.0
-		if flt(item.incoming_rate) > 0:
-			valuation_rate = flt(item.incoming_rate)
-		elif item.delivery_note and item.dn_detail:
-			valuation_rate = (
-				frappe.db.get_value("Delivery Note Item", item.dn_detail, "incoming_rate")
-				or 0.0
-			)
-		elif item.sales_order and item.so_detail:
-			dn_rates = frappe.get_all(
-				"Delivery Note Item",
-				filters={"so_detail": item.so_detail, "docstatus": 1},
-				fields=["incoming_rate"],
-			)
-			if dn_rates:
-				total_rate = sum(flt(d.incoming_rate) for d in dn_rates)
-				valuation_rate = total_rate / len(dn_rates)
-		if not valuation_rate:
-			valuation_rate = (
-				frappe.db.get_value("Item", item.item_code, "valuation_rate") or 0.0
-			)
-		total_buying_amount += flt(item.stock_qty) * flt(valuation_rate)
-
-	profit_amount = total_sales_amount - total_buying_amount
-	doc.custom_profit_percentage = (
-		(profit_amount / total_sales_amount) * 100.0 if total_sales_amount > 0 else 0.0
-	)
-	
-	if total_sales_amount > 0:
-		if total_buying_amount > 0:
-			doc.custom_profit_markup_percentage_ = (profit_amount / total_buying_amount) * 100.0
-		else:
-			doc.custom_profit_markup_percentage_ = 100.0
-	else:
-		doc.custom_profit_markup_percentage_ = 0.0
 
 
 def calculate_commission(doc):
