@@ -28,7 +28,9 @@ app_license = "mit"
 # app_include_css = "/assets/redtra_customisation/css/redtra_customisation.css"
 app_include_js = [
 	"/assets/redtra_customisation/js/list_view_fix.js",
-	"/assets/redtra_customisation/js/company_navbar_display.js"
+	"/assets/redtra_customisation/js/company_navbar_display.js",
+	"/assets/redtra_customisation/js/date_session_override.js",
+	"/assets/redtra_customisation/js/date_session_navbar.js"
 ]
 
 # include js, css files in header of web template
@@ -170,6 +172,12 @@ doc_events = {
  },
  "Stock Entry": {
     "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
+ },
+ "Sales Invoice": {
+    "validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
+ },
+ "Sales Person": {
+    "validate": "redtra_customisation.redtra_customisation.custom.sales_person.validate_slabs"
  }
 }
 
@@ -178,7 +186,8 @@ doc_events = {
 
 scheduler_events = {
 	"daily": [
-		"redtra_customisation.pdc.notifications.send_pdc_reminders"
+		"redtra_customisation.pdc.notifications.send_pdc_reminders",
+		"redtra_customisation.redtra_customisation.custom.customer_commission.update_customer_commissions"
 	]
 }
 

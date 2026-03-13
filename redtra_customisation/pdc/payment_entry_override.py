@@ -64,9 +64,13 @@ class CustomPaymentEntry(PaymentEntry):
 			if getdate(self.pdc_cheque_date) > getdate(self.posting_date):
 				self.posting_date = self.pdc_cheque_date
 
-		# Set initial status
-		if self.is_cheque_payment() and not self.pdc_cheque_status:
-			self.pdc_cheque_status = "Issued"
+		# Set initial status only on new records
+		if self.is_new() and self.is_cheque_payment() and not self.pdc_cheque_status:
+			custom_settings = frappe.get_single("Redtra Custom Setting")
+			if custom_settings.create_pdc_directly_under_collection:
+				self.pdc_cheque_status = "Under Collection"
+			else:
+				self.pdc_cheque_status = "Issued"
 
 	def on_submit(self):
 		super().on_submit()
@@ -75,33 +79,46 @@ class CustomPaymentEntry(PaymentEntry):
 
 	def create_initial_pdc_entry(self):
 		"""Create initial PDC accounting entry"""
-		if self.pdc_cheque_status != "Issued":
+		if self.pdc_cheque_status not in ["Issued", "Under Collection"]:
 			return
 
 		# Get PDC accounts from settings
 		pdc_settings = frappe.get_single("PDC Settings")
+		custom_settings = frappe.get_single("Redtra Custom Setting")
 		
-		if self.payment_type == "Receive":
-			# For received cheques: Debit PDC Received, Credit AR
-			# This is already handled by Payment Entry, just verify accounts
-			if self.paid_from != pdc_settings.pdc_received_account:
-				frappe.msgprint(_(
-					"Please ensure Paid From account is set to PDC Received Account "
-					"for cheque payments"
-				), alert=True)
+		# Determine which account to check against
+		if custom_settings.create_pdc_directly_under_collection:
+			target_account = pdc_settings.under_collection_account
+			account_label = "Under Collection Account"
 		else:
-			# For issued cheques: Credit PDC Issued, Debit AP
-			if self.paid_to != pdc_settings.pdc_issued_account:
+			target_account = pdc_settings.pdc_received_account if self.payment_type == "Receive" else pdc_settings.pdc_issued_account
+			account_label = "PDC Received Account" if self.payment_type == "Receive" else "PDC Issued Account"
+
+		if self.payment_type == "Receive":
+			# For received cheques: Debit Check Account, Credit AR
+			if self.paid_from != target_account:
 				frappe.msgprint(_(
-					"Please ensure Paid To account is set to PDC Issued Account "
+					"Please ensure Paid From account is set to {0} "
 					"for cheque payments"
-				), alert=True)
+				).format(account_label), alert=True)
+		else:
+			# For issued cheques: Credit Check Account, Debit AP
+			if self.paid_to != target_account:
+				frappe.msgprint(_(
+					"Please ensure Paid To account is set to {0} "
+					"for cheque payments"
+				).format(account_label), alert=True)
+		
+		if custom_settings.create_pdc_directly_under_collection:
+			self.pdc_cheque_status = "Issued"
+			self.mark_under_collection()
+			
 
 		# Add initial entry to cheque details
 		if not self.pdc_cheque_details:
 			self.append("pdc_cheque_details", {
 				"journal_entry": "",
-				"stage": "Issued",
+				"stage": self.pdc_cheque_status,
 				"date": self.posting_date,
 				"amount": self.paid_amount if self.payment_type == "Pay" else self.received_amount
 			})
@@ -127,6 +144,11 @@ class CustomPaymentEntry(PaymentEntry):
 		je.posting_date = nowdate()
 		je.company = self.company
 		je.user_remark = f"PDC Under Collection - {self.name} - Cheque: {self.pdc_cheque_number}"
+		
+		if self.payment_type == "Pay":
+			je.custom_is_pdc_pay = 1
+		else:
+			je.custom_is_pdc_receive = 1
 
 		amount = self.paid_amount if self.payment_type == "Pay" else self.received_amount
 
@@ -197,6 +219,11 @@ class CustomPaymentEntry(PaymentEntry):
 		je.posting_date = nowdate()
 		je.company = self.company
 		je.user_remark = f"PDC Collected - {self.name} - Cheque: {self.pdc_cheque_number}"
+
+		if self.payment_type == "Pay":
+			je.custom_is_pdc_pay = 1
+		else:
+			je.custom_is_pdc_receive = 1
 
 		amount = self.paid_amount if self.payment_type == "Pay" else self.received_amount
 		bank_account = self.pdc_bank_account or self.paid_to if self.payment_type == "Receive" else self.paid_from
@@ -277,6 +304,11 @@ class CustomPaymentEntry(PaymentEntry):
 		reverse_je = frappe.copy_doc(original_je)
 		reverse_je.posting_date = nowdate()
 		reverse_je.user_remark = f"PDC Bounced - Reversal - {self.name} - Cheque: {self.pdc_cheque_number}"
+		
+		if self.payment_type == "Pay":
+			reverse_je.custom_is_pdc_pay = 1
+		else:
+			reverse_je.custom_is_pdc_receive = 1
 		
 		# Reverse the amounts
 		for account in reverse_je.accounts:
