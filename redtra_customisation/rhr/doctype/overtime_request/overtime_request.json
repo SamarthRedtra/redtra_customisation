@@ -1,0 +1,155 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-03-13 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "employee",
+  "employee_name",
+  "attendance_date",
+  "from_time",
+  "till_time",
+  "overtime_hours",
+  "company",
+  "column_break_1",
+  "overtime_approver",
+  "overtime_status",
+  "is_holiday",
+  "is_earned",
+  "attendance"
+ ],
+ "fields": [
+  {
+   "default": "OTR-.YYYY.-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "OTR-.YYYY.-.#####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "attendance_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Attendance Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "from_time",
+   "fieldtype": "Time",
+   "label": "From Time"
+  },
+  {
+   "fieldname": "till_time",
+   "fieldtype": "Time",
+   "label": "Till Time"
+  },
+  {
+   "fieldname": "overtime_hours",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Overtime Hours",
+   "precision": 2,
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "overtime_approver",
+   "fieldtype": "Link",
+   "label": "Overtime Approver",
+   "options": "User"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "overtime_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Overtime Status",
+   "options": "Draft\nApproved\nRejected"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_holiday",
+   "fieldtype": "Check",
+   "label": "Is Holiday"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_earned",
+   "fieldtype": "Check",
+   "label": "Is Earned"
+  },
+  {
+   "fieldname": "attendance",
+   "fieldtype": "Link",
+   "label": "Attendance",
+   "options": "Attendance",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-13 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "rhr",
+ "name": "Overtime Request",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
