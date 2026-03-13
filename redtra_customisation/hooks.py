@@ -52,6 +52,8 @@ app_include_js = [
 doctype_js = {
 	"Payment Entry": "public/js/payment_entry_pdc.js",
 	"Customer": "public/js/customer_pdc_dashboard.js",
+	"Sales Invoice": "public/js/sales_invoice_commission.js",
+	"Sales Order": "public/js/sales_order_commission.js",
 	"Supplier": "public/js/supplier_pdc_dashboard.js",
 	"Shift Type": "rhr/doctype/shift_type/shift_type.js",
 }
@@ -161,6 +163,9 @@ doc_events = {
 	},
  "Purchase Order": {
     "on_update": "redtra_customisation.override.purchase_order.on_update_po"
+ },
+ "Sales Order": {
+	"validate": "redtra_customisation.commission.apply_project_wise_commission"
  },
  "Item": {
     "validate": "redtra_customisation.redtra_customisation.service_item_validator.validate_item_accounts",

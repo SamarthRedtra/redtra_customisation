@@ -3,6 +3,7 @@
 # Read docs to understand patches: https://frappeframework.com/docs/v14/user/en/database-migrations
 
 [post_model_sync]
-# Patches added in this section will be executed after doctypes are migrated
-redtra_customisation.patches.v16_0.enable_pdc_cheque_status_on_submit #hh
-redtra_customisation.patches.v16_0.add_overtime_custom_fields #ggg
+# Patches added in this section will be executed after doctypes are migrated 
+redtra_customisation.patches.v16_0.enable_pdc_cheque_status_on_submit #hhg
+redtra_customisation.patches.v16_0.add_overtime_custom_fields #gggf
+redtra_customisation.patches.v16_0.add_project_commission_defaults #dfhfh
