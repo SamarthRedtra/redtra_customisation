@@ -1,5 +1,10 @@
 import frappe
 from frappe.utils import flt
+from redtra_customisation.commission import (
+	apply_sales_partner_commission_from_team,
+	_set_sales_partner_commission_fields,
+	get_project_commission_rate,
+)
 
 # Module-level caches (per-request, cleared on bench restart)
 _NON_STOCK_ITEMS_CACHE = None
@@ -312,51 +317,142 @@ class _DocGrossProfitGenerator:
 		self.si_list = new_list
 
 
-def calculate_commission(doc):
-	"""
-	Calculate commission for Sales Persons based on slabs.
-	"""
-	if not doc.sales_team:
-		return
+def _is_sales_invoice_from_sales_order(doc):
+	return any(row.get("sales_order") for row in (doc.get("items") or []))
 
-	# Fetch the custom commission setting
-	settings = frappe.get_cached_doc("Redtra Custom Setting")
+
+def _get_commission_base_amount(doc, row=None, force_net_total=False, force_total=False):
+	if force_total:
+		total_amount = flt(doc.get("base_total"))
+		if row and flt(row.get("allocated_percentage")) > 0:
+			return total_amount * (flt(row.get("allocated_percentage")) / 100.0)
+		return total_amount
+
+	if row and flt(row.get("allocated_amount")) > 0:
+		return flt(row.get("allocated_amount"))
+
+	if force_net_total:
+		return flt(doc.get("base_net_total"))
+
+	return flt(doc.get("amount_eligible_for_commission") or doc.get("base_net_total"))
+
+
+def _normalize_commission_doc(doc):
+	as_dict_method = getattr(doc, "as_dict", None)
+	if callable(as_dict_method):
+		doc = as_dict_method()
+
+	doc = frappe._dict(doc or {})
+	doc.sales_team = [frappe._dict(row) for row in (doc.get("sales_team") or [])]
+	return doc
+
+
+def _build_commission_preview(doc, settings=None):
+	doc = _normalize_commission_doc(doc)
+	settings = settings or frappe.get_cached_doc("Redtra Custom Setting")
+
 	use_markup_for_slabs = getattr(settings, "use_markup_percentage_for_commission", 0)
-
-	profit_percentage = flt(doc.custom_profit_percentage)
-	markup_percentage = flt(doc.custom_profit_markup_percentage_)
-	
-	# Evaluate basis for percentage comparison
+	profit_percentage = flt(doc.get("custom_profit_percentage"))
+	markup_percentage = flt(doc.get("custom_profit_markup_percentage_"))
 	comparison_percentage = markup_percentage if use_markup_for_slabs else profit_percentage
-	
-	is_sales_based = getattr(doc, "custom_enable_sales_based", 0)
+
+	is_sales_based = flt(doc.get("custom_enable_sales_based"))
 	customer_commission = 0.0
-	if is_sales_based and doc.customer:
-		customer_commission = flt(frappe.db.get_value("Customer", doc.customer, "custom_comission"))
-		
+	if is_sales_based and doc.get("customer"):
+		customer_commission = flt(
+			frappe.db.get_value("Customer", doc.get("customer"), "custom_comission")
+		)
+
+	project_commission_rate = None
+	if not is_sales_based:
+		project_commission_rate = get_project_commission_rate(
+			doc.get("project"), settings=settings
+		)
+	use_total_for_commission = project_commission_rate is not None and _is_sales_invoice_from_sales_order(doc)
+	use_net_total_for_commission = project_commission_rate is not None and not use_total_for_commission
+
 	sales_person_cache = {}
+	rows = []
 
 	for row in doc.sales_team:
 		if is_sales_based:
 			commission_rate = customer_commission
+		elif project_commission_rate is not None:
+			commission_rate = project_commission_rate
 		else:
-			if row.sales_person not in sales_person_cache:
-				sales_person_cache[row.sales_person] = frappe.get_cached_doc(
-					"Sales Person", row.sales_person
-				)
-			sales_person_doc = sales_person_cache[row.sales_person]
-	
 			commission_rate = 0.0
-			if sales_person_doc.custom_enable_slab and sales_person_doc.custom_slabs:
-				for slab in sales_person_doc.custom_slabs:
-					if flt(slab.get("from")) <= comparison_percentage <= flt(slab.get("to")):
-						commission_rate = flt(slab.get("value"))
-						break
+			if row.get("sales_person"):
+				if row.sales_person not in sales_person_cache:
+					sales_person_cache[row.sales_person] = frappe.get_cached_doc(
+						"Sales Person", row.sales_person
+					)
+				sales_person_doc = sales_person_cache[row.sales_person]
 
-		row.commission_rate = commission_rate
-		base_amount = (
-			flt(row.allocated_amount)
-			if flt(row.allocated_amount) > 0
-			else flt(doc.base_net_total)
+				if sales_person_doc.custom_enable_slab and sales_person_doc.custom_slabs:
+					for slab in sales_person_doc.custom_slabs:
+						if flt(slab.get("from")) <= comparison_percentage <= flt(slab.get("to")):
+							commission_rate = flt(slab.get("value"))
+							break
+
+		base_amount = _get_commission_base_amount(
+			doc,
+			row,
+			force_net_total=use_net_total_for_commission,
+			force_total=use_total_for_commission,
 		)
-		row.incentives = base_amount * (commission_rate / 100.0)
+		rows.append(
+			{
+				"name": row.get("name"),
+				"sales_person": row.get("sales_person"),
+				"commission_rate": commission_rate,
+				"incentives": base_amount * (commission_rate / 100.0),
+			}
+		)
+
+	header_commission_rate = flt(doc.get("commission_rate"))
+	if project_commission_rate is not None:
+		header_commission_rate = project_commission_rate
+	elif is_sales_based:
+		header_commission_rate = customer_commission
+
+	amount_eligible_for_commission = _get_commission_base_amount(
+		doc,
+		force_net_total=use_net_total_for_commission,
+		force_total=use_total_for_commission,
+	)
+	total_commission = amount_eligible_for_commission * (header_commission_rate / 100.0)
+
+	preview = {
+		"project_commission_rate": project_commission_rate,
+		"commission_rate": header_commission_rate,
+		"amount_eligible_for_commission": amount_eligible_for_commission,
+		"total_commission": total_commission,
+		"rows": rows,
+	}
+	return apply_sales_partner_commission_from_team(doc, preview, settings=settings)
+
+
+def calculate_commission(doc):
+	"""
+	Calculate commission for Sales Persons based on slabs.
+	"""
+	preview = _build_commission_preview(doc)
+
+	doc.amount_eligible_for_commission = preview.get("amount_eligible_for_commission")
+	doc.commission_rate = preview.get("commission_rate")
+	doc.total_commission = preview.get("total_commission")
+	_set_sales_partner_commission_fields(doc, preview)
+
+	row_by_name = {row.get("name"): row for row in preview.get("rows", []) if row.get("name")}
+	for row in doc.get("sales_team") or []:
+		updated_row = row_by_name.get(row.name)
+		if not updated_row:
+			continue
+		row.commission_rate = updated_row.get("commission_rate")
+		row.incentives = updated_row.get("incentives")
+
+
+@frappe.whitelist()
+def get_commission_preview(doc):
+	doc = frappe.parse_json(doc) if isinstance(doc, str) else doc
+	return _build_commission_preview(doc)

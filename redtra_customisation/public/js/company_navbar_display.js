@@ -12,11 +12,11 @@ class CompanyNavbarDisplay {
 		this.currentCompany = null;
 		this.displayElement = null;
 		this.isInitialized = false;
-		
+
 		// Bind methods
 		this.updateDisplay = this.updateDisplay.bind(this);
 		this.handleCompanyChange = this.handleCompanyChange.bind(this);
-		
+
 		// Initialize when DOM is ready
 		if (document.readyState === 'loading') {
 			document.addEventListener('DOMContentLoaded', () => this.initialize());
@@ -24,33 +24,33 @@ class CompanyNavbarDisplay {
 			this.initialize();
 		}
 	}
-	
+
 	/**
 	 * Initialize the company navbar display
 	 * Requirements: 12.1, 12.3
 	 */
 	initialize() {
 		if (this.isInitialized) return;
-		
+
 		// Wait for Frappe to be ready
 		if (typeof frappe === 'undefined' || !frappe.session) {
 			setTimeout(() => this.initialize(), 100);
 			return;
 		}
-		
+
 		// Create display element
 		this.createDisplayElement();
-		
+
 		// Get initial company
 		this.getCurrentCompany();
-		
+
 		// Setup company change detection
 		this.setupCompanyChangeDetection();
-		
+
 		this.isInitialized = true;
 		console.log('Company Navbar Display initialized');
 	}
-	
+
 	/**
 	 * Create the company display element in the navbar
 	 * Requirements: 12.1, 12.3
@@ -63,25 +63,25 @@ class CompanyNavbarDisplay {
 			setTimeout(() => this.createDisplayElement(), 500);
 			return;
 		}
-		
+
 		// Check if display already exists
 		if (document.getElementById('company-navbar-display')) {
 			this.displayElement = document.getElementById('company-navbar-display');
 			return;
 		}
-		
+
 		// Create company display element
 		const companyDisplay = document.createElement('li');
 		companyDisplay.id = 'company-navbar-display';
 		companyDisplay.className = 'nav-item company-display';
-		
+
 		companyDisplay.innerHTML = `
 			<div class="nav-link company-info">
 				<span class="company-icon">🏢</span>
 				<span class="company-name" id="current-company-name">Loading...</span>
 			</div>
 		`;
-		
+
 		// Insert before the user menu (usually the last item)
 		const userMenu = navbar.querySelector('.dropdown') || navbar.lastElementChild;
 		if (userMenu) {
@@ -89,20 +89,20 @@ class CompanyNavbarDisplay {
 		} else {
 			navbar.appendChild(companyDisplay);
 		}
-		
+
 		this.displayElement = companyDisplay;
-		
+
 		// Add styles
 		this.addStyles();
 	}
-	
+
 	/**
 	 * Add CSS styles for the company display
 	 * Requirements: 12.3
 	 */
 	addStyles() {
 		if (document.getElementById('company-navbar-styles')) return;
-		
+
 		const styles = document.createElement('style');
 		styles.id = 'company-navbar-styles';
 		styles.textContent = `
@@ -168,10 +168,10 @@ class CompanyNavbarDisplay {
 				}
 			}
 		`;
-		
+
 		document.head.appendChild(styles);
 	}
-	
+
 	/**
 	 * Get the current company from Frappe session or defaults
 	 * Requirements: 12.2, 12.5
@@ -179,27 +179,27 @@ class CompanyNavbarDisplay {
 	getCurrentCompany() {
 		// Try to get company from various sources
 		let company = null;
-		
+
 		// 1. From frappe.defaults (most reliable)
 		if (frappe.defaults && frappe.defaults.get_default) {
 			company = frappe.defaults.get_default('Company');
 		}
-		
+
 		// 2. From frappe.boot (fallback)
 		if (!company && frappe.boot && frappe.boot.default_company) {
 			company = frappe.boot.default_company;
 		}
-		
+
 		// 3. From user defaults (another fallback)
 		if (!company && frappe.user_defaults && frappe.user_defaults.Company) {
 			company = frappe.user_defaults.Company;
 		}
-		
+
 		// 4. From session user (last resort)
 		if (!company && frappe.session && frappe.session.user_defaults) {
 			company = frappe.session.user_defaults.Company;
 		}
-		
+
 		if (company && company !== this.currentCompany) {
 			this.currentCompany = company;
 			this.updateDisplay();
@@ -208,7 +208,7 @@ class CompanyNavbarDisplay {
 			this.getFirstAvailableCompany();
 		}
 	}
-	
+
 	/**
 	 * Get the first available company if no default is set
 	 */
@@ -229,17 +229,17 @@ class CompanyNavbarDisplay {
 			}
 		});
 	}
-	
+
 	/**
 	 * Update the display with current company information
 	 * Requirements: 12.1, 12.2, 12.5
 	 */
 	updateDisplay() {
 		if (!this.displayElement || !this.currentCompany) return;
-		
+
 		const companyNameElement = this.displayElement.querySelector('#current-company-name');
 		if (!companyNameElement) return;
-		
+
 		// Get company display name (abbreviation or full name)
 		frappe.call({
 			method: 'frappe.client.get_value',
@@ -257,31 +257,31 @@ class CompanyNavbarDisplay {
 			}
 		});
 	}
-	
+
 	/**
 	 * Get appropriate display name for company
 	 * Requirements: 12.3, 12.4
 	 */
 	getCompanyDisplayName(companyData) {
 		const { company_name, abbr } = companyData;
-		
+
 		// Use abbreviation if available and short
 		if (abbr && abbr.length <= 6) {
 			return abbr;
 		}
-		
+
 		// Use first word of company name if it's reasonable length
 		const firstWord = company_name.split(' ')[0];
 		if (firstWord.length <= 12) {
 			return firstWord;
 		}
-		
+
 		// Truncate company name if too long
-		return company_name.length > 15 ? 
-			company_name.substring(0, 12) + '...' : 
+		return company_name.length > 15 ?
+			company_name.substring(0, 12) + '...' :
 			company_name;
 	}
-	
+
 	/**
 	 * Setup detection for company changes
 	 * Requirements: 12.2, 12.5
@@ -299,23 +299,23 @@ class CompanyNavbarDisplay {
 				return result;
 			};
 		}
-		
+
 		// Monitor route changes that might indicate company context changes
 		$(document).on('page-change', () => {
 			setTimeout(() => this.getCurrentCompany(), 100);
 		});
-		
+
 		// Monitor form loads that might have company context
 		frappe.ui.form && frappe.ui.form.on && frappe.ui.form.on('refresh', () => {
 			setTimeout(() => this.getCurrentCompany(), 100);
 		});
-		
+
 		// Periodic check for company changes (fallback)
 		setInterval(() => {
 			this.getCurrentCompany();
 		}, 5000);
 	}
-	
+
 	/**
 	 * Handle company change events
 	 * Requirements: 12.2, 12.5
@@ -324,7 +324,7 @@ class CompanyNavbarDisplay {
 		if (newCompany && newCompany !== this.currentCompany) {
 			this.currentCompany = newCompany;
 			this.updateDisplay();
-			
+
 			// Trigger custom event for other components
 			const event = new CustomEvent('company-changed', {
 				detail: { company: newCompany }
@@ -332,7 +332,7 @@ class CompanyNavbarDisplay {
 			document.dispatchEvent(event);
 		}
 	}
-	
+
 	/**
 	 * Get current company (public method)
 	 * Requirements: 12.1
@@ -340,7 +340,7 @@ class CompanyNavbarDisplay {
 	getCurrentCompanyName() {
 		return this.currentCompany;
 	}
-	
+
 	/**
 	 * Manually refresh the display
 	 * Requirements: 12.5
@@ -348,7 +348,7 @@ class CompanyNavbarDisplay {
 	refresh() {
 		this.getCurrentCompany();
 	}
-	
+
 	/**
 	 * Destroy the company display (cleanup)
 	 */
@@ -356,12 +356,12 @@ class CompanyNavbarDisplay {
 		if (this.displayElement) {
 			this.displayElement.remove();
 		}
-		
+
 		const styles = document.getElementById('company-navbar-styles');
 		if (styles) {
 			styles.remove();
 		}
-		
+
 		this.isInitialized = false;
 	}
 }
@@ -388,9 +388,12 @@ window.CompanyNavbarDisplay = CompanyNavbarDisplay;
 window.companyNavbarDisplay = companyNavbarDisplay;
 
 // Frappe integration
-frappe.ready(() => {
-	if (!companyNavbarDisplay) {
-		companyNavbarDisplay = new CompanyNavbarDisplay();
-		window.companyNavbarDisplay = companyNavbarDisplay;
-	}
-});
+// Frappe integration
+if (window.frappe && frappe.ready) {
+	frappe.ready(() => {
+		if (!companyNavbarDisplay) {
+			companyNavbarDisplay = new CompanyNavbarDisplay();
+			window.companyNavbarDisplay = companyNavbarDisplay;
+		}
+	});
+}

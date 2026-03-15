@@ -52,7 +52,10 @@ app_include_js = [
 doctype_js = {
 	"Payment Entry": "public/js/payment_entry_pdc.js",
 	"Customer": "public/js/customer_pdc_dashboard.js",
-	"Supplier": "public/js/supplier_pdc_dashboard.js"
+	"Sales Invoice": "public/js/sales_invoice_commission.js",
+	"Sales Order": "public/js/sales_order_commission.js",
+	"Supplier": "public/js/supplier_pdc_dashboard.js",
+	"Shift Type": "rhr/doctype/shift_type/shift_type.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -143,7 +146,9 @@ after_migrate = "redtra_customisation.pdc.install.after_migrate"
 
 override_doctype_class = {
 	"BOM Creator": "redtra_customisation.override.bom_creator.CustomBOMCreator",
-	"Payment Entry": "redtra_customisation.pdc.payment_entry_override.CustomPaymentEntry"
+	"Payment Entry": "redtra_customisation.pdc.payment_entry_override.CustomPaymentEntry",
+	"Salary Slip": "redtra_customisation.rpayroll.doctype.salary_slip.salary_slip_overtime.SalarySlipOvertime",
+	"Shift Type": "redtra_customisation.rhr.doctype.shift_type.shift_type.ShiftType",
 }
 
 # Document Events
@@ -151,13 +156,16 @@ override_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
-	# "*": {
-	# 	"on_update": "method",
-	# 	"on_cancel": "method",
-	# 	"on_trash": "method"
-	# },
+	"Attendance": {
+		"before_save": "redtra_customisation.rhr.doctype.attendance.attendance_overtime.before_save_attendance",
+		"on_submit": "redtra_customisation.rhr.doctype.attendance.attendance_overtime.on_submit_attendance",
+		"on_cancel": "redtra_customisation.rhr.doctype.attendance.attendance_overtime.on_cancel_attendance",
+	},
  "Purchase Order": {
     "on_update": "redtra_customisation.override.purchase_order.on_update_po"
+ },
+ "Sales Order": {
+	"validate": "redtra_customisation.commission.apply_project_wise_commission"
  },
  "Item": {
     "validate": "redtra_customisation.redtra_customisation.service_item_validator.validate_item_accounts",
@@ -224,7 +232,7 @@ scheduler_events = {
 
 # Request Events
 # ----------------
-# before_request = ["redtra_customisation.utils.before_request"]
+before_request = ["redtra_customisation.rpayroll.install.patch_employee_checkin_for_overtime_once"]
 # after_request = ["redtra_customisation.utils.after_request"]
 
 # Job Events
