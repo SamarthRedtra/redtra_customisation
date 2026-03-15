@@ -102,11 +102,20 @@ def get_overtime_custom_fields():
 				"insert_after": "overtime_section",
 			},
 			{
+				# Add the total field here as a fallback for sites where HRMS did not create it.
+				"fieldname": "total_overtime_hours",
+				"fieldtype": "Float",
+				"label": "Total Overtime Hours",
+				"precision": 2,
+				"read_only": 1,
+				"insert_after": "overtime_requests",
+			},
+			{
 				"fieldname": "holidays_overtime_hours",
 				"fieldtype": "Float",
 				"label": "Holidays Overtime Hours",
 				"read_only": 1,
-				"insert_after": "overtime_requests",
+				"insert_after": "total_overtime_hours",
 			},
 			{
 				"fieldname": "food_allowance_counts",

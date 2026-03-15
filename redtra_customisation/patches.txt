@@ -6,4 +6,5 @@
 # Patches added in this section will be executed after doctypes are migrated 
 redtra_customisation.patches.v16_0.enable_pdc_cheque_status_on_submit #hhg
 redtra_customisation.patches.v16_0.add_overtime_custom_fields #gggf
+redtra_customisation.patches.v16_0.reapply_overtime_custom_fields # rerun overtime field creation for already-migrated sites
 redtra_customisation.patches.v16_0.add_project_commission_defaults #dfhfh

@@ -150,7 +150,7 @@ def create_food_allowance_additional_salary_if_eligible(attendance_doc) -> tuple
 	normal_threshold = flt(payroll_settings.food_allowance_normal_days_threshold) or 12
 	holiday_threshold = flt(payroll_settings.food_allowance_holiday_weekend_threshold) or 0
 
-	qualifies = holiday_threshold == 0 or total_hours > holiday_threshold if is_holiday else total_hours > normal_threshold
+	qualifies = holiday_threshold == 0 or total_hours >= holiday_threshold if is_holiday else total_hours >= normal_threshold
 	if not qualifies:
 		return None
 
