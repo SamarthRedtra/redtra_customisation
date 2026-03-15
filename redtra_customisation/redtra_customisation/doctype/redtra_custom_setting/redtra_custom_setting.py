@@ -9,8 +9,18 @@ from frappe.model.document import Document
 
 class RedtraCustomSetting(Document):
 	def validate(self):
+		self.validate_sales_partner_commission_percentage()
 		self.ensure_default_project_commission_slabs()
 		self.validate_project_commission_slabs()
+
+	def validate_sales_partner_commission_percentage(self):
+		commission_percentage = self.get("sales_partner_comssion_percentage")
+		if commission_percentage in (None, ""):
+			return
+
+		commission_percentage = flt(commission_percentage)
+		if commission_percentage < 0:
+			frappe.throw(_("Sales Partner Comssion % cannot be negative"))
 
 	def ensure_default_project_commission_slabs(self):
 		if self.get("project_commission_slabs"):

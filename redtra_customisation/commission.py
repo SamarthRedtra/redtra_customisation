@@ -7,13 +7,13 @@ from frappe.utils import flt
 
 def apply_project_wise_commission(doc, method=None):
 	preview = _build_sales_order_commission_preview(doc)
-	commission_rate = preview.get("commission_rate")
-	if commission_rate is None:
+	if preview.get("commission_rate") is None:
 		return
 
 	doc.amount_eligible_for_commission = preview.get("amount_eligible_for_commission")
-	doc.commission_rate = commission_rate
+	doc.commission_rate = preview.get("commission_rate")
 	doc.total_commission = preview.get("total_commission")
+	_set_sales_partner_commission_fields(doc, preview)
 
 	row_by_name = {row.get("name"): row for row in preview.get("rows", []) if row.get("name")}
 	for sales_person in doc.get("sales_team") or []:
@@ -23,7 +23,7 @@ def apply_project_wise_commission(doc, method=None):
 		sales_person.commission_rate = updated_row.get("commission_rate")
 		sales_person.incentives = updated_row.get("incentives")
 
-	if hasattr(doc, "calculate_contribution"):
+	if not preview.get("sales_partner_commission_applied") and hasattr(doc, "calculate_contribution"):
 		doc.calculate_contribution()
 
 
@@ -40,6 +40,47 @@ def get_project_commission_rate(project, settings=None):
 		return None
 
 	return get_commission_rate(settings.get("project_commission_slabs"), project_value)
+
+
+def get_sales_partner_comssion_percentage(settings=None):
+	settings = settings or frappe.get_cached_doc("Redtra Custom Setting")
+	value = settings.get("sales_partner_comssion_percentage")
+	if value in (None, ""):
+		return None
+
+	return flt(value)
+
+
+def apply_sales_partner_commission_from_team(doc, preview, settings=None):
+	settings = settings or frappe.get_cached_doc("Redtra Custom Setting")
+	partner_percentage = get_sales_partner_comssion_percentage(settings=settings)
+	if not doc.get("sales_partner") or partner_percentage is None:
+		preview["sales_partner_commission_applied"] = False
+		preview["sales_partner_commission_percentage"] = 0
+		preview["sales_partner_commission_amount"] = 0
+		return preview
+
+	total_sales_team_commission = sum(
+		flt(row.get("incentives")) for row in (preview.get("rows") or [])
+	)
+	preview["amount_eligible_for_commission"] = total_sales_team_commission
+	preview["commission_rate"] = partner_percentage
+	preview["total_commission"] = total_sales_team_commission * (partner_percentage / 100.0)
+	preview["sales_partner_commission_applied"] = True
+	preview["sales_partner_commission_percentage"] = partner_percentage
+	preview["sales_partner_commission_amount"] = preview["total_commission"]
+	return preview
+
+
+def _set_sales_partner_commission_fields(doc, preview):
+	if hasattr(doc, "custom_sales_partner_commission_percentage"):
+		doc.custom_sales_partner_commission_percentage = preview.get(
+			"sales_partner_commission_percentage", 0
+		)
+	if hasattr(doc, "custom_sales_partner_commission_amount"):
+		doc.custom_sales_partner_commission_amount = preview.get(
+			"sales_partner_commission_amount", 0
+		)
 
 
 @frappe.whitelist()
@@ -78,13 +119,15 @@ def _get_sales_order_commission_base_amount(doc, row=None):
 
 def _build_sales_order_commission_preview(doc):
 	doc = _normalize_commission_doc(doc)
-	commission_rate = get_project_commission_rate(doc.get("project"))
+	settings = frappe.get_cached_doc("Redtra Custom Setting")
+	commission_rate = get_project_commission_rate(doc.get("project"), settings=settings)
 
 	if commission_rate is None:
-		return {
+		preview = {
 			"commission_rate": None,
 			"amount_eligible_for_commission": flt(doc.get("amount_eligible_for_commission")),
 			"total_commission": flt(doc.get("total_commission")),
+			"sales_partner_commission_applied": False,
 			"rows": [
 				{
 					"name": row.get("name"),
@@ -95,6 +138,7 @@ def _build_sales_order_commission_preview(doc):
 				for row in doc.sales_team
 			],
 		}
+		return apply_sales_partner_commission_from_team(doc, preview, settings=settings)
 
 	rows = []
 	for row in doc.sales_team:
@@ -109,12 +153,14 @@ def _build_sales_order_commission_preview(doc):
 		)
 
 	amount_eligible_for_commission = _get_sales_order_commission_base_amount(doc)
-	return {
+	preview = {
 		"commission_rate": commission_rate,
 		"amount_eligible_for_commission": amount_eligible_for_commission,
 		"total_commission": amount_eligible_for_commission * (commission_rate / 100.0),
+		"sales_partner_commission_applied": False,
 		"rows": rows,
 	}
+	return apply_sales_partner_commission_from_team(doc, preview, settings=settings)
 
 
 @frappe.whitelist()

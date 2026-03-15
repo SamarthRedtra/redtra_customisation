@@ -126,3 +126,40 @@ def get_overtime_custom_fields():
 			},
 		],
 	}
+
+
+def get_sales_partner_commission_custom_fields():
+	return {
+		"Sales Order": [
+			{
+				"fieldname": "custom_sales_partner_commission_percentage",
+				"fieldtype": "Percent",
+				"label": "Sales Partner Commission %",
+				"read_only": 1,
+				"insert_after": "sales_partner",
+			},
+			{
+				"fieldname": "custom_sales_partner_commission_amount",
+				"fieldtype": "Currency",
+				"label": "Sales Partner Commission Amount",
+				"read_only": 1,
+				"insert_after": "custom_sales_partner_commission_percentage",
+			},
+		],
+		"Sales Invoice": [
+			{
+				"fieldname": "custom_sales_partner_commission_percentage",
+				"fieldtype": "Percent",
+				"label": "Sales Partner Commission %",
+				"read_only": 1,
+				"insert_after": "sales_partner",
+			},
+			{
+				"fieldname": "custom_sales_partner_commission_amount",
+				"fieldtype": "Currency",
+				"label": "Sales Partner Commission Amount",
+				"read_only": 1,
+				"insert_after": "custom_sales_partner_commission_percentage",
+			},
+		],
+	}

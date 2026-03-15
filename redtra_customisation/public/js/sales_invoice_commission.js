@@ -40,14 +40,6 @@ const update_project_commission_preview = (frm) => {
 				rows.filter((row) => row.name).map((row) => [row.name, row])
 			);
 
-			setIfChanged(
-				frm,
-				"amount_eligible_for_commission",
-				message.amount_eligible_for_commission || 0
-			);
-			setIfChanged(frm, "commission_rate", message.commission_rate || 0);
-			setIfChanged(frm, "total_commission", message.total_commission || 0);
-
 			(frm.doc.sales_team || []).forEach((row) => {
 				const updated_row =
 					row_by_name.get(row.name) ||
@@ -69,6 +61,30 @@ const update_project_commission_preview = (frm) => {
 			});
 
 			frm.refresh_field("sales_team");
+
+			// Apply header values after child row updates so partner commission
+			// remains based on team incentives during realtime preview.
+			setIfChanged(
+				frm,
+				"amount_eligible_for_commission",
+				message.amount_eligible_for_commission || 0
+			);
+			setIfChanged(frm, "commission_rate", message.commission_rate || 0);
+			setIfChanged(frm, "total_commission", message.total_commission || 0);
+			if ("custom_sales_partner_commission_percentage" in frm.doc) {
+				setIfChanged(
+					frm,
+					"custom_sales_partner_commission_percentage",
+					message.sales_partner_commission_percentage || 0
+				);
+			}
+			if ("custom_sales_partner_commission_amount" in frm.doc) {
+				setIfChanged(
+					frm,
+					"custom_sales_partner_commission_amount",
+					message.sales_partner_commission_amount || 0
+				);
+			}
 		},
 	});
 };
@@ -78,6 +94,9 @@ frappe.ui.form.on("Sales Invoice", {
 		update_project_commission_preview(frm);
 	},
 	project(frm) {
+		update_project_commission_preview(frm);
+	},
+	sales_partner(frm) {
 		update_project_commission_preview(frm);
 	},
 	custom_enable_sales_based(frm) {

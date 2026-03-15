@@ -13,6 +13,7 @@
     "service_item_account_mandatory",
     "commission_settings",
     "use_markup_percentage_for_commission",
+    "sales_partner_comssion_percentage",
     "project_commission_section",
     "enable_project_wise_commission",
     "project_commission_slabs"
@@ -67,6 +68,12 @@
       "fieldname": "use_markup_percentage_for_commission",
       "fieldtype": "Check",
       "label": "Use Markup Percentage for Commission Slabs"
+    },
+    {
+      "fieldname": "sales_partner_comssion_percentage",
+      "fieldtype": "Percent",
+      "label": "Sales Partner Comssion %",
+      "description": "Apply this percentage on total sales team commission to calculate sales partner commission"
     },
     {
       "fieldname": "project_commission_section",

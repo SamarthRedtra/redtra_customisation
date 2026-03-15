@@ -1,6 +1,10 @@
 import frappe
 from frappe.utils import flt
-from redtra_customisation.commission import get_project_commission_rate
+from redtra_customisation.commission import (
+	apply_sales_partner_commission_from_team,
+	_set_sales_partner_commission_fields,
+	get_project_commission_rate,
+)
 
 # Module-level caches (per-request, cleared on bench restart)
 _NON_STOCK_ITEMS_CACHE = None
@@ -418,13 +422,14 @@ def _build_commission_preview(doc, settings=None):
 	)
 	total_commission = amount_eligible_for_commission * (header_commission_rate / 100.0)
 
-	return {
+	preview = {
 		"project_commission_rate": project_commission_rate,
 		"commission_rate": header_commission_rate,
 		"amount_eligible_for_commission": amount_eligible_for_commission,
 		"total_commission": total_commission,
 		"rows": rows,
 	}
+	return apply_sales_partner_commission_from_team(doc, preview, settings=settings)
 
 
 def calculate_commission(doc):
@@ -436,6 +441,7 @@ def calculate_commission(doc):
 	doc.amount_eligible_for_commission = preview.get("amount_eligible_for_commission")
 	doc.commission_rate = preview.get("commission_rate")
 	doc.total_commission = preview.get("total_commission")
+	_set_sales_partner_commission_fields(doc, preview)
 
 	row_by_name = {row.get("name"): row for row in preview.get("rows", []) if row.get("name")}
 	for row in doc.get("sales_team") or []:
