@@ -14,6 +14,7 @@ from redtra_customisation.rpayroll.overtime_helpers import (
 
 
 class SalarySlipOvertime(SalarySlip):
+	@frappe.whitelist()
 	def get_emp_and_working_day_details(self):
 		if self.employee and self.start_date and self.end_date:
 			submit_draft_food_allowance_for_employee_period(self.employee, self.start_date, self.end_date)
