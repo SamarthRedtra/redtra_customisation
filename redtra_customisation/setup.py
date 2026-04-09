@@ -128,6 +128,20 @@ def get_overtime_custom_fields():
 	}
 
 
+def get_work_order_custom_fields():
+	return {
+		"Work Order": [
+			{
+				"fieldname": "custom_customer",
+				"fieldtype": "Link",
+				"label": "Customer",
+				"options": "Customer",
+				"insert_after": "company",
+			},
+		],
+	}
+
+
 def get_sales_partner_commission_custom_fields():
 	return {
 		"Sales Order": [
