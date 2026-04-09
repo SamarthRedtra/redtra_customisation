@@ -1,0 +1,28 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-04-10 00:37:03.995523",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-04-10 00:52:04.105396",
+ "modified_by": "Administrator",
+ "module": "Redtra Customisation",
+ "name": "Consolidated Production Report",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Stock Entry Detail",
+ "report_name": "Consolidated Production Report",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "All"
+  }
+ ],
+ "timeout": 0
+}
