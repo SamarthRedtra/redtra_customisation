@@ -11,6 +11,48 @@ def _empty_totals():
 	}
 
 
+def _get_boq_commission_accounts(company):
+	if not company or not frappe.db.exists("DocType", "BOQ Settings"):
+		return {}
+	return frappe.db.get_value(
+		"BOQ Settings",
+		company,
+		["sales_person_commission_account", "sales_partner_commission_account"],
+		as_dict=True,
+	) or {}
+
+
+def _get_gl_commission_total(project, company, account, from_date=None, to_date=None):
+	if not (project and company and account):
+		return 0
+
+	conditions = [
+		"gle.project = %(project)s",
+		"gle.company = %(company)s",
+		"gle.account = %(account)s",
+		"gle.is_cancelled = 0",
+		"gle.voucher_type = 'Journal Entry'",
+	]
+	args = {"project": project, "company": company, "account": account}
+	if from_date:
+		conditions.append("gle.posting_date >= %(from_date)s")
+		args["from_date"] = from_date
+	if to_date:
+		conditions.append("gle.posting_date <= %(to_date)s")
+		args["to_date"] = to_date
+
+	return flt(
+		frappe.db.sql(
+			f"""
+			SELECT COALESCE(SUM(gle.debit - gle.credit), 0)
+			FROM `tabGL Entry` gle
+			WHERE {' AND '.join(conditions)}
+			""",
+			args,
+		)[0][0]
+	)
+
+
 @frappe.whitelist()
 def get_project_commission_totals(project=None) -> dict:
 	"""
@@ -73,6 +115,22 @@ def get_project_commission_totals(project=None) -> dict:
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Sales Partner commission KPI")
 		sales_partner_total = 0.0
+
+	commission_accounts = _get_boq_commission_accounts(company)
+	sales_person_total += _get_gl_commission_total(
+		project,
+		company,
+		commission_accounts.get("sales_person_commission_account"),
+		from_date,
+		to_date,
+	)
+	sales_partner_total += _get_gl_commission_total(
+		project,
+		company,
+		commission_accounts.get("sales_partner_commission_account"),
+		from_date,
+		to_date,
+	)
 
 	return {
 		"sales_person_commission_total": flt(sales_person_total),

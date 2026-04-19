@@ -56,8 +56,12 @@ doctype_js = {
 	"Sales Order": "public/js/sales_order_commission.js",
 	"Supplier": "public/js/supplier_pdc_dashboard.js",
 	"Shift Type": "rhr/doctype/shift_type/shift_type.js",
+	"Post Dated Cheques Tool": "redtra_customisation/doctype/post_dated_cheques_tool/post_dated_cheques_tool.js",
+	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques.js",
 }
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {
+	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques_list.js",
+}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 doctype_tree_js = {"Account" : "public/js/account_tree.js",
                    }
