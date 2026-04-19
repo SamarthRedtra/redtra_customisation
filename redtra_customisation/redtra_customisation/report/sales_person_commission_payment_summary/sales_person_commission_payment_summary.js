@@ -89,7 +89,7 @@ frappe.query_reports["Sales Person Commission Payment Summary"] = {
 			fieldname: "doc_type",
 			label: __("Document Type"),
 			fieldtype: "Select",
-			options: "Sales Order\nDelivery Note\nSales Invoice",
+			options: "Sales Order\nDelivery Note\nSales Invoice\nJournal Entry",
 			default: "Sales Order",
 		},
 		{

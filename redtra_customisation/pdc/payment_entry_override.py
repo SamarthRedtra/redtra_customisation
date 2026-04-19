@@ -40,7 +40,7 @@ class CustomPaymentEntry(PaymentEntry):
 		
 		try:
 			# Check if mode name contains "cheque" (case insensitive)
-			if "cheque" in self.mode_of_payment.lower():
+			if "cheque" in self.mode_of_payment.lower() and hasattr(self, "custom_is_pdc_entry") and self.custom_is_pdc_entry == 0:
 				return True
 			
 			# Also check mode of payment configuration
