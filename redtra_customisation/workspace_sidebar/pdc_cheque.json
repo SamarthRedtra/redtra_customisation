@@ -1,0 +1,40 @@
+{
+ "app": "redtra_customisation",
+ "creation": "2026-04-19 18:19:08.118838",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "money-coins-1",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Post Dated Cheque",
+   "link_to": "Post Dated Cheques",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "\ud83d\udcb0",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "PDC Convertion Tool",
+   "link_to": "Post Dated Cheques Tool",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-04-19 19:18:41.039690",
+ "modified_by": "Administrator",
+ "module": "Redtra Customisation",
+ "name": "PDC Cheque",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "PDC Cheque"
+}
