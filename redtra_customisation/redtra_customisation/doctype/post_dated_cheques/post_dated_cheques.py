@@ -5,5 +5,11 @@ from frappe.model.document import Document
 
 
 class PostDatedCheques(Document):
-	pass
+	def on_cancel(self):
+		self.status = "Cancelled"
+		self.db_update()
+		
+	def before_insert(self):
+		self.status ="Pending"
+						
 

@@ -13,8 +13,11 @@
   "section_break_jivv",
   "company",
   "project",
+  "cost_center",
+  "department",
   "column_break_1",
   "status",
+  "posting_date",
   "section_break_party",
   "payment_type",
   "party_type",
@@ -25,6 +28,8 @@
   "reference_no",
   "reference_date",
   "section_break_amount",
+  "invoice_references",
+  "column_break_references",
   "amount",
   "account_currency",
   "exchange_rate",
@@ -50,6 +55,25 @@
    "in_list_view": 1,
    "label": "Project",
    "options": "Project"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Department"
   },
   {
    "fieldname": "column_break_1",
@@ -138,7 +162,17 @@
   {
    "fieldname": "section_break_amount",
    "fieldtype": "Section Break",
-   "label": "Amount"
+   "label": "References & Amount"
+  },
+  {
+   "fieldname": "invoice_references",
+   "fieldtype": "Table",
+   "label": "Invoice References",
+   "options": "PDC Invoice Reference"
+  },
+  {
+   "fieldname": "column_break_references",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "amount",
@@ -169,7 +203,8 @@
    "fieldtype": "Link",
    "in_filter": 1,
    "label": "Bank Account",
-   "options": "Account"
+   "options": "Account",
+   "reqd": 1
   },
   {
    "fieldname": "notes",
@@ -216,7 +251,7 @@
  "idx": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-19 18:58:15.229222",
+ "modified": "2026-04-19 22:02:47.848575",
  "modified_by": "Administrator",
  "module": "Redtra Customisation",
  "name": "Post Dated Cheques",

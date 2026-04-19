@@ -106,6 +106,7 @@
  "modified_by": "Administrator",
  "module": "Redtra Customisation",
  "name": "Post Dated Cheques Tool",
+ "issingle": 1,
  "owner": "Administrator",
  "permissions": [
   {

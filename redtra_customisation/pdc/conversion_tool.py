@@ -58,6 +58,10 @@ def get_pending_post_dated_cheques(filters: dict | None = None) -> list[dict]:
 		conditions.append("pdc.reference_date <= %(to_date)s")
 		values["to_date"] = filters["to_date"]
 
+	if filters.get("name"):
+		conditions.append("pdc.name = %(name)s")
+		values["name"] = filters["name"]
+
 	if filters.get("currency"):
 		conditions.append("pdc.account_currency = %(currency)s")
 		values["currency"] = filters["currency"]
@@ -180,6 +184,8 @@ def _make_payment_entry_from_pdc(pdc, bank_account: str | None):
 		pe.custom_is_pdc_entry = 1
 	pe.company = pdc.company
 	pe.project = pdc.project
+	pe.cost_center = pdc.get("cost_center")
+	pe.department = pdc.get("department")
 	pe.payment_type = pdc.payment_type
 	pe.party_type = pdc.party_type
 	pe.party = pdc.party
@@ -196,7 +202,7 @@ def _make_payment_entry_from_pdc(pdc, bank_account: str | None):
 		pe.pdc_cheque_date = pdc.reference_date
 
 	# Set posting date to cheque date for post-dated flows (override will also do it)
-	pe.posting_date = pdc.reference_date or nowdate()
+	pe.posting_date = pdc.posting_date or pdc.reference_date or nowdate()
 
 	# Accounts
 	if pdc.payment_type == "Receive":
@@ -221,5 +227,14 @@ def _make_payment_entry_from_pdc(pdc, bank_account: str | None):
 		if hasattr(pe, "target_exchange_rate") and flt(pdc.exchange_rate):
 			pe.target_exchange_rate = flt(pdc.exchange_rate)
 
-	# References (optional, can be extended to allocate invoices)
+	# References (allocate invoices)
+	for ref in pdc.get("invoice_references") or []:
+		pe.append("references", {
+			"reference_doctype": ref.reference_doctype,
+			"reference_name": ref.reference_name,
+			"total_amount": ref.total_amount,
+			"outstanding_amount": ref.outstanding_amount,
+			"allocated_amount": ref.allocated_amount
+		})
+
 	return pe
