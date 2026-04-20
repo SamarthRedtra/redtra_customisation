@@ -16,6 +16,7 @@
   "default_bank_account",
   "currency",
   "apply_default_bank_account_to_all_rows",
+  "execution_date",
   "get_post_dated_cheques",
   "section_break_details",
   "cheques_details"
@@ -82,6 +83,11 @@
    "fieldname": "apply_default_bank_account_to_all_rows",
    "fieldtype": "Check",
    "label": "Apply Default Bank Account to All Rows"
+  },
+  {
+   "fieldname": "execution_date",
+   "fieldtype": "Date",
+   "label": "Execution Date"
   },
   {
    "fieldname": "get_post_dated_cheques",

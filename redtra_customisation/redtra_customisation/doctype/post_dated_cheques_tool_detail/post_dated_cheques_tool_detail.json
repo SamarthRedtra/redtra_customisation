@@ -24,6 +24,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Post Dated Cheque",
+   "link_filters": "[[\"Post Dated Cheques\",\"docstatus\",\"=\",\"1\"]]",
    "options": "Post Dated Cheques",
    "reqd": 1
   },
@@ -84,7 +85,6 @@
   {
    "fieldname": "account_currency",
    "fieldtype": "Link",
-   "in_list_view": 0,
    "label": "Account Currency",
    "options": "Currency"
   },
@@ -107,14 +107,14 @@
  "idx": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-04-17 10:00:00",
+ "modified": "2026-04-20 22:20:23.447624",
  "modified_by": "Administrator",
  "module": "Redtra Customisation",
  "name": "Post Dated Cheques Tool Detail",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": []
 }
-

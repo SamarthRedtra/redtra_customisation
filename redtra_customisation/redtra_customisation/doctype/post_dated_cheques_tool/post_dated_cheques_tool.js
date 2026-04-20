@@ -120,6 +120,7 @@ async function convert_selected(frm) {
 	const rows = selected.map((r) => ({
 		pdc: r.pdc,
 		bank_account: r.bank_account || frm.doc.default_bank_account,
+		posting_date_override: frm.doc.execution_date
 	}));
 
 	frappe.dom.freeze(__("Creating Payment Entries..."));

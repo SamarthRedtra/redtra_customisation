@@ -18,6 +18,7 @@
   "column_break_1",
   "status",
   "posting_date",
+  "actual_posting_date",
   "section_break_party",
   "payment_type",
   "party_type",
@@ -64,15 +65,24 @@
    "reqd": 1
   },
   {
+   "allow_on_submit": 1,
+   "fieldname": "actual_posting_date",
+   "fieldtype": "Date",
+   "label": "Actual Posting Date",
+   "read_only": 1
+  },
+  {
    "fieldname": "cost_center",
    "fieldtype": "Link",
    "label": "Cost Center",
+   "link_filters": "[[\"Cost Center\",\"is_group\",\"=\",0]]",
    "options": "Cost Center"
   },
   {
    "fieldname": "department",
    "fieldtype": "Link",
    "label": "Department",
+   "link_filters": "[[\"Department\",\"is_group\",\"=\",0]]",
    "options": "Department"
   },
   {
@@ -126,7 +136,6 @@
    "reqd": 1
   },
   {
-   "fetch_from": "party.customer_name",
    "fieldname": "party_name",
    "fieldtype": "Data",
    "label": "Party Name",
@@ -251,7 +260,7 @@
  "idx": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-19 22:02:47.848575",
+ "modified": "2026-04-20 22:20:56.701929",
  "modified_by": "Administrator",
  "module": "Redtra Customisation",
  "name": "Post Dated Cheques",
