@@ -145,7 +145,11 @@ def convert_post_dated_cheques(rows: list[dict], defaults: dict | None = None) -
 				if not frappe.has_permission("Payment Entry", "create"):
 					raise frappe.PermissionError(_("You do not have permission to create Payment Entry"))
 
-			pe = _make_payment_entry_from_pdc(pdc, bank_account=row.get("bank_account") or defaults.get("default_bank_account"))
+			pe = _make_payment_entry_from_pdc(
+				pdc, 
+				bank_account=row.get("bank_account") or defaults.get("default_bank_account"),
+				posting_date_override=row.get("posting_date_override")
+			)
 			pe.insert()
 
 			if auto_submit:
@@ -153,6 +157,7 @@ def convert_post_dated_cheques(rows: list[dict], defaults: dict | None = None) -
 
 			pdc.db_set("payment_entry", pe.name, update_modified=False)
 			pdc.db_set("status", "Converted", update_modified=False)
+			pdc.db_set("actual_posting_date", pe.posting_date, update_modified=False)
 			# payment_entry_status is a fetch_from field; setting is optional but harmless if column exists
 			if frappe.db.has_column("Post Dated Cheques", "payment_entry_status"):
 				pdc.db_set("payment_entry_status", pe.status, update_modified=False)
@@ -165,7 +170,7 @@ def convert_post_dated_cheques(rows: list[dict], defaults: dict | None = None) -
 	return {"created": out_created, "failures": out_failures}
 
 
-def _make_payment_entry_from_pdc(pdc, bank_account: str | None):
+def _make_payment_entry_from_pdc(pdc, bank_account: str | None, posting_date_override: str | None = None):
 	if not bank_account:
 		# prefer bank_account stored on PDC itself
 		bank_account = pdc.get("bank_account")
@@ -189,6 +194,7 @@ def _make_payment_entry_from_pdc(pdc, bank_account: str | None):
 	pe.payment_type = pdc.payment_type
 	pe.party_type = pdc.party_type
 	pe.party = pdc.party
+	pe.party_name = pdc.party_name
 	pe.mode_of_payment = pdc.mode_of_payment
 
 	# Standard ERPNext fields
@@ -201,8 +207,8 @@ def _make_payment_entry_from_pdc(pdc, bank_account: str | None):
 	if hasattr(pe, "pdc_cheque_date"):
 		pe.pdc_cheque_date = pdc.reference_date
 
-	# Set posting date to cheque date for post-dated flows (override will also do it)
-	pe.posting_date = pdc.posting_date or pdc.reference_date or nowdate()
+	# Set posting date to cheque date primarily for post-dated flows
+	pe.posting_date = posting_date_override or pdc.reference_date or pdc.posting_date or nowdate()
 
 	# Accounts
 	if pdc.payment_type == "Receive":

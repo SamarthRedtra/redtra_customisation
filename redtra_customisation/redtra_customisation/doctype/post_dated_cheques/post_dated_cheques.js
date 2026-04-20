@@ -50,11 +50,48 @@ frappe.ui.form.on("Post Dated Cheques", {
 
 		if (frm.doc.docstatus === 1 && frm.doc.status === "Pending") {
 			frm.add_custom_button(__("Convert Cheque"), () => {
-				frappe.route_options = {
-					pdc: frm.doc.name,
-					company: frm.doc.company,
-				};
-				frappe.set_route("Form", "Post Dated Cheques Tool");
+				frappe.prompt([
+					{
+						label: __("Execution Date"),
+						fieldname: "execution_date",
+						fieldtype: "Date",
+						default: frm.doc.reference_date,
+						reqd: 1
+					}
+				], (values) => {
+					frappe.call({
+						method: "redtra_customisation.pdc.conversion_tool.convert_post_dated_cheques",
+						args: {
+							rows: [{
+								pdc: frm.doc.name,
+								bank_account: frm.doc.bank_account,
+								posting_date_override: values.execution_date
+							}],
+							defaults: {
+								company: frm.doc.company
+							}
+						},
+						callback: function(r) {
+							if (r.message && r.message.created && r.message.created.length) {
+								const pe_name = r.message.created[0].payment_entry;
+								frappe.show_alert({
+									message: __("Converted to Payment Entry: {0}", [
+										`<a href="/app/payment-entry/${pe_name}">${pe_name}</a>`
+									]),
+									indicator: "green"
+								});
+								frm.reload_doc();
+							}
+							if (r.message && r.message.failures && r.message.failures.length) {
+								frappe.msgprint({
+									title: __("Conversion Failed"),
+									message: r.message.failures[0].error,
+									indicator: "red"
+								});
+							}
+						}
+					});
+				}, __("Convert to Payment Entry"), __("Convert"));
 			});
 		}
 
@@ -87,11 +124,30 @@ frappe.ui.form.on("Post Dated Cheques", {
 		frm.clear_table("invoice_references");
 		calculate_total_amount(frm);
 	},
+	payment_type(frm) {
+		if (frm.doc.payment_type === "Receive") {
+			frm.set_value("party_type", "Customer");
+		} else if (frm.doc.payment_type === "Pay") {
+			frm.set_value("party_type", "Supplier");
+		}
+	},
 	party_type(frm) {
+		frm.set_value("party", "");
+		frm.set_value("party_name", "");
 		frm.clear_table("invoice_references");
 		calculate_total_amount(frm);
 	},
 	party(frm) {
+		if (frm.doc.party && frm.doc.party_type) {
+			const name_field = frm.doc.party_type === "Customer" ? "customer_name" : "supplier_name";
+			frappe.db.get_value(frm.doc.party_type, frm.doc.party, name_field, (r) => {
+				if (r && r[name_field]) {
+					frm.set_value("party_name", r[name_field]);
+				}
+			});
+		} else {
+			frm.set_value("party_name", "");
+		}
 		frm.clear_table("invoice_references");
 		calculate_total_amount(frm);
 	},
