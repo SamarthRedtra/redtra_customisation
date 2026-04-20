@@ -182,12 +182,15 @@ doc_events = {
  "Stock Entry": {
     "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
  },
- "Sales Invoice": {
-    "validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
- },
- "Sales Person": {
-    "validate": "redtra_customisation.redtra_customisation.custom.sales_person.validate_slabs"
- }
+	"Sales Invoice": {
+		"validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
+	},
+	"Sales Person": {
+		"validate": "redtra_customisation.redtra_customisation.custom.sales_person.validate_slabs"
+	},
+	"Workflow Action": {
+		"after_insert": "redtra_customisation.pdc.workflow_notifications.send_workflow_system_notification"
+	}
 }
 
 # Scheduled Tasks
