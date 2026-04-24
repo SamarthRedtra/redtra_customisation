@@ -158,6 +158,8 @@ frappe.ui.form.on("Post Dated Cheques", {
 			return;
 		}
 
+		const is_purchase_invoice = frm.doc.party_type !== "Customer";
+		const target_doctype = is_purchase_invoice ? "Purchase Invoice" : "Sales Invoice";
 		const party_field = frm.doc.party_type === "Customer" ? "customer" : "supplier";
 		const fil = [
 			["docstatus", "=", 1],
@@ -167,8 +169,11 @@ frappe.ui.form.on("Post Dated Cheques", {
 		];
 
 		const dialog = new frappe.ui.form.MultiSelectDialog({
-			doctype: frm.doc.party_type === "Customer" ? "Sales Invoice" : "Purchase Invoice",
+			doctype: target_doctype,
 			target: frm,
+			columns: is_purchase_invoice
+				? ["name", "custom_supplier_invoice_no", "grand_total", "outstanding_amount"]
+				: undefined,
 			setters: [
 				{
 					fieldname: "company",
@@ -186,6 +191,15 @@ frappe.ui.form.on("Post Dated Cheques", {
 				}
 			],
 			get_query() {
+				if (is_purchase_invoice) {
+					return {
+						query: "redtra_customisation.redtra_customisation.doctype.post_dated_cheques.post_dated_cheques.search_purchase_invoice_for_pdc",
+						filters: {
+							company: frm.doc.company,
+							supplier: frm.doc.party
+						}
+					};
+				}
 				return {
 					filters: fil
 				};
@@ -199,15 +213,17 @@ frappe.ui.form.on("Post Dated Cheques", {
 				frappe.call({
 					method: "frappe.client.get_list",
 					args: {
-						doctype: frm.doc.party_type === "Customer" ? "Sales Invoice" : "Purchase Invoice",
+						doctype: target_doctype,
 						filters: fetch_filters,
-						fields: ["name", "grand_total", "outstanding_amount"]
+						fields: is_purchase_invoice
+							? ["name", "custom_supplier_invoice_no", "grand_total", "outstanding_amount"]
+							: ["name", "grand_total", "outstanding_amount"]
 					},
 					callback(r) {
 						if (r.message) {
 							r.message.forEach(d => {
 								const row = frm.add_child("invoice_references");
-								row.reference_doctype = frm.doc.party_type === "Customer" ? "Sales Invoice" : "Purchase Invoice";
+								row.reference_doctype = target_doctype;
 								row.reference_name = d.name;
 								row.total_amount = d.grand_total;
 								row.outstanding_amount = d.outstanding_amount;
