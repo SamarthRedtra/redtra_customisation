@@ -50,7 +50,7 @@ def send_workflow_system_notification(doc, method):
 		notification = frappe.new_doc("Notification Log")
 		notification.subject = subject
 		notification.for_user = user
-		notification.type = "Notification"
+		notification.type = "Alert"
 		notification.document_type = doc.reference_doctype
 		notification.document_name = doc.reference_name
 		notification.from_user = current_user
