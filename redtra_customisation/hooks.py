@@ -151,6 +151,7 @@ after_migrate = "redtra_customisation.pdc.install.after_migrate"
 override_doctype_class = {
 	"BOM Creator": "redtra_customisation.override.bom_creator.CustomBOMCreator",
 	"Payment Entry": "redtra_customisation.pdc.payment_entry_override.CustomPaymentEntry",
+	"Payroll Entry": "redtra_customisation.rpayroll.doctype.payroll_entry.payroll_entry.CustomPayrollEntry",
 	"Salary Slip": "redtra_customisation.rpayroll.doctype.salary_slip.salary_slip_overtime.SalarySlipOvertime",
 	"Shift Type": "redtra_customisation.rhr.doctype.shift_type.shift_type.ShiftType",
 }
