@@ -22,18 +22,60 @@ def _get_boq_commission_accounts(company):
 	) or {}
 
 
-def _get_gl_commission_total(project, company, account, from_date=None, to_date=None):
-	if not (project and company and account):
+def _get_gl_commission_total(project, company, account, from_date=None, to_date=None, is_partner=False):
+	if not (project and company):
+		return 0
+
+	accounts = []
+	if account:
+		accounts.append(account)
+
+	# Find additional accounts based on naming conventions
+	if is_partner:
+		filters = [
+			["company", "=", company],
+			["is_group", "=", 0],
+			["account_name", "like", "%Sales Partner Commission%"],
+		]
+		additional = frappe.db.get_all("Account", filters=filters, pluck="name")
+		accounts.extend(additional)
+		
+		filters_2 = [
+			["company", "=", company],
+			["is_group", "=", 0],
+			["account_name", "like", "%Commission on Sales Partner%"],
+		]
+		additional_2 = frappe.db.get_all("Account", filters=filters_2, pluck="name")
+		accounts.extend(additional_2)
+	else:
+		filters = [
+			["company", "=", company],
+			["is_group", "=", 0],
+			["account_name", "like", "%Sales commission%"],
+		]
+		additional = frappe.db.get_all("Account", filters=filters, pluck="name")
+		accounts.extend(additional)
+		
+		filters_2 = [
+			["company", "=", company],
+			["is_group", "=", 0],
+			["account_name", "like", "%Commission on Sales%"],
+		]
+		additional_2 = frappe.db.get_all("Account", filters=filters_2, pluck="name")
+		accounts.extend(additional_2)
+
+	accounts = list(set(accounts))
+	if not accounts:
 		return 0
 
 	conditions = [
 		"gle.project = %(project)s",
 		"gle.company = %(company)s",
-		"gle.account = %(account)s",
+		"gle.account IN %(accounts)s",
 		"gle.is_cancelled = 0",
 		"gle.voucher_type = 'Journal Entry'",
 	]
-	args = {"project": project, "company": company, "account": account}
+	args = {"project": project, "company": company, "accounts": accounts}
 	if from_date:
 		conditions.append("gle.posting_date >= %(from_date)s")
 		args["from_date"] = from_date
@@ -123,6 +165,7 @@ def get_project_commission_totals(project=None) -> dict:
 		commission_accounts.get("sales_person_commission_account"),
 		from_date,
 		to_date,
+		is_partner=False,
 	)
 	sales_partner_total += _get_gl_commission_total(
 		project,
@@ -130,6 +173,7 @@ def get_project_commission_totals(project=None) -> dict:
 		commission_accounts.get("sales_partner_commission_account"),
 		from_date,
 		to_date,
+		is_partner=True,
 	)
 
 	return {

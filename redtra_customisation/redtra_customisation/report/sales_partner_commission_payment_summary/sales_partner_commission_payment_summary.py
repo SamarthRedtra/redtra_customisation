@@ -187,8 +187,8 @@ def get_journal_entries(filters):
 	if not company:
 		return []
 
-	commission_account = _get_commission_account(company)
-	if not commission_account:
+	commission_accounts = _get_commission_accounts(company)
+	if not commission_accounts:
 		return []
 
 	conditions = [
@@ -196,9 +196,9 @@ def get_journal_entries(filters):
 		"gle.is_cancelled = 0",
 		"gle.company = %(company)s",
 		"gle.voucher_type = 'Journal Entry'",
-		"gle.account = %(account)s",
+		"gle.account IN %(accounts)s",
 	]
-	args = {"company": company, "account": commission_account}
+	args = {"company": company, "accounts": commission_accounts}
 
 	for field in ("from_date", "to_date", "project"):
 		value = filters.get(field)
@@ -254,10 +254,30 @@ def get_journal_entries(filters):
 	return rows
 
 
-def _get_commission_account(company):
-	if not frappe.db.exists("DocType", "BOQ Settings"):
-		return None
-	return frappe.db.get_value("BOQ Settings", company, "sales_partner_commission_account")
+def _get_commission_accounts(company):
+	accounts = []
+	if frappe.db.exists("DocType", "BOQ Settings"):
+		acc = frappe.db.get_value("BOQ Settings", company, "sales_partner_commission_account")
+		if acc:
+			accounts.append(acc)
+
+	filters = [
+		["company", "=", company],
+		["is_group", "=", 0],
+		["account_name", "like", "%Sales Partner Commission%"],
+	]
+	additional = frappe.db.get_all("Account", filters=filters, pluck="name")
+	accounts.extend(additional)
+	
+	filters_2 = [
+		["company", "=", company],
+		["is_group", "=", 0],
+		["account_name", "like", "%Commission on Sales Partner%"],
+	]
+	additional_2 = frappe.db.get_all("Account", filters=filters_2, pluck="name")
+	accounts.extend(additional_2)
+
+	return list(set(accounts))
 
 
 def get_conditions(dt, filters, date_field):
