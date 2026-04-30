@@ -120,14 +120,30 @@ frappe.ui.form.on("Sales Team", {
 });
 
 frappe.ui.form.on("Sales Invoice Item", {
-	qty(frm) {
+	qty(frm, cdt, cdn) {
 		update_project_commission_preview(frm);
+		// Also trigger deduction recalculation (from construction_management)
+		if (typeof _si_deduction_debounce === 'function') {
+			const row = locals[cdt][cdn];
+			if (typeof _is_deduction_item === 'function' && _is_deduction_item(row)) return;
+			_si_deduction_debounce(frm);
+		}
 	},
-	rate(frm) {
+	rate(frm, cdt, cdn) {
 		update_project_commission_preview(frm);
+		if (typeof _si_deduction_debounce === 'function') {
+			const row = locals[cdt][cdn];
+			if (typeof _is_deduction_item === 'function' && _is_deduction_item(row)) return;
+			_si_deduction_debounce(frm);
+		}
 	},
-	amount(frm) {
+	amount(frm, cdt, cdn) {
 		update_project_commission_preview(frm);
+		if (typeof _si_deduction_debounce === 'function') {
+			const row = locals[cdt][cdn];
+			if (typeof _is_deduction_item === 'function' && _is_deduction_item(row)) return;
+			_si_deduction_debounce(frm);
+		}
 	},
 	net_amount(frm) {
 		update_project_commission_preview(frm);

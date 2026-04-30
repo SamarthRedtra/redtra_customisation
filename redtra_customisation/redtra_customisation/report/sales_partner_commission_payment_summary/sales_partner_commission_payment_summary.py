@@ -188,6 +188,7 @@ def get_journal_entries(filters):
 		return []
 
 	commission_accounts = _get_commission_accounts(company)
+	print(f"Commission Accounts: {commission_accounts}")
 	if not commission_accounts:
 		return []
 
@@ -276,7 +277,23 @@ def _get_commission_accounts(company):
 	]
 	additional_2 = frappe.db.get_all("Account", filters=filters_2, pluck="name")
 	accounts.extend(additional_2)
-
+	
+	filters_3 = [
+		["company", "=", company],
+		["is_group", "=", 0],
+		["account_name", "like", "%Sales Commission%"],
+	]
+	additional_3 = frappe.db.get_all("Account", filters=filters_3, pluck="name")
+	accounts.extend(additional_3)
+	
+	filters_4 = [
+		["company", "=", company],
+		["is_group", "=", 0],
+		["account_name", "like", "%Commission on Sales%"],
+	]
+	additional_4 = frappe.db.get_all("Account", filters=filters_4, pluck="name")
+	accounts.extend(additional_4)
+	print(f"Accounts: {accounts}")
 	return list(set(accounts))
 
 

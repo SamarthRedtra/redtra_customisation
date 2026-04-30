@@ -32,37 +32,33 @@ def _get_gl_commission_total(project, company, account, from_date=None, to_date=
 
 	# Find additional accounts based on naming conventions
 	if is_partner:
-		filters = [
-			["company", "=", company],
-			["is_group", "=", 0],
-			["account_name", "like", "%Sales Partner Commission%"],
+		patterns = [
+			"%Sales Partner Commission%",
+			"%Commission on Sales Partner%",
+			"%Sales commission%",
+			"%Commission on Sales%",
 		]
-		additional = frappe.db.get_all("Account", filters=filters, pluck="name")
-		accounts.extend(additional)
-		
-		filters_2 = [
-			["company", "=", company],
-			["is_group", "=", 0],
-			["account_name", "like", "%Commission on Sales Partner%"],
-		]
-		additional_2 = frappe.db.get_all("Account", filters=filters_2, pluck="name")
-		accounts.extend(additional_2)
+		for pattern in patterns:
+			filters = [
+				["company", "=", company],
+				["is_group", "=", 0],
+				["account_name", "like", pattern],
+			]
+			additional = frappe.db.get_all("Account", filters=filters, pluck="name")
+			accounts.extend(additional)
 	else:
-		filters = [
-			["company", "=", company],
-			["is_group", "=", 0],
-			["account_name", "like", "%Sales commission%"],
+		patterns = [
+			"%Sales commission%",
+			"%Commission on Sales%",
 		]
-		additional = frappe.db.get_all("Account", filters=filters, pluck="name")
-		accounts.extend(additional)
-		
-		filters_2 = [
-			["company", "=", company],
-			["is_group", "=", 0],
-			["account_name", "like", "%Commission on Sales%"],
-		]
-		additional_2 = frappe.db.get_all("Account", filters=filters_2, pluck="name")
-		accounts.extend(additional_2)
+		for pattern in patterns:
+			filters = [
+				["company", "=", company],
+				["is_group", "=", 0],
+				["account_name", "like", pattern],
+			]
+			additional = frappe.db.get_all("Account", filters=filters, pluck="name")
+			accounts.extend(additional)
 
 	accounts = list(set(accounts))
 	if not accounts:
@@ -110,19 +106,9 @@ def get_project_commission_totals(project=None) -> dict:
 	if not company:
 		return _empty_totals()
 
-	today_d = today()
+	# Removing date filters to show "whole" project total as requested
 	from_date = None
-	to_date = today_d
-
-	try:
-		from erpnext.accounts.utils import get_fiscal_year
-
-		fy = get_fiscal_year(date=today_d, company=company, raise_on_missing=False)
-		if fy:
-			from_date, fy_end = fy[1], fy[2]
-			to_date = today_d if str(today_d) <= str(fy_end) else fy_end
-	except Exception:
-		pass
+	to_date = None
 
 	base_filters = {
 		"company": company,
