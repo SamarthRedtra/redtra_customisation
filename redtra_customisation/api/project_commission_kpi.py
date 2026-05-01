@@ -23,46 +23,11 @@ def _get_boq_commission_accounts(company):
 
 
 def _get_gl_commission_total(project, company, account, from_date=None, to_date=None, is_partner=False):
-	if not (project and company):
+	if not (project and company and account):
 		return 0
 
-	accounts = []
-	if account:
-		accounts.append(account)
+	accounts = [account]
 
-	# Find additional accounts based on naming conventions
-	if is_partner:
-		patterns = [
-			"%Sales Partner Commission%",
-			"%Commission on Sales Partner%",
-			"%Sales commission%",
-			"%Commission on Sales%",
-		]
-		for pattern in patterns:
-			filters = [
-				["company", "=", company],
-				["is_group", "=", 0],
-				["account_name", "like", pattern],
-			]
-			additional = frappe.db.get_all("Account", filters=filters, pluck="name")
-			accounts.extend(additional)
-	else:
-		patterns = [
-			"%Sales commission%",
-			"%Commission on Sales%",
-		]
-		for pattern in patterns:
-			filters = [
-				["company", "=", company],
-				["is_group", "=", 0],
-				["account_name", "like", pattern],
-			]
-			additional = frappe.db.get_all("Account", filters=filters, pluck="name")
-			accounts.extend(additional)
-
-	accounts = list(set(accounts))
-	if not accounts:
-		return 0
 
 	conditions = [
 		"gle.project = %(project)s",

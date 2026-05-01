@@ -262,38 +262,6 @@ def _get_commission_accounts(company):
 		if acc:
 			accounts.append(acc)
 
-	filters = [
-		["company", "=", company],
-		["is_group", "=", 0],
-		["account_name", "like", "%Sales Partner Commission%"],
-	]
-	additional = frappe.db.get_all("Account", filters=filters, pluck="name")
-	accounts.extend(additional)
-	
-	filters_2 = [
-		["company", "=", company],
-		["is_group", "=", 0],
-		["account_name", "like", "%Commission on Sales Partner%"],
-	]
-	additional_2 = frappe.db.get_all("Account", filters=filters_2, pluck="name")
-	accounts.extend(additional_2)
-	
-	filters_3 = [
-		["company", "=", company],
-		["is_group", "=", 0],
-		["account_name", "like", "%Sales Commission%"],
-	]
-	additional_3 = frappe.db.get_all("Account", filters=filters_3, pluck="name")
-	accounts.extend(additional_3)
-	
-	filters_4 = [
-		["company", "=", company],
-		["is_group", "=", 0],
-		["account_name", "like", "%Commission on Sales%"],
-	]
-	additional_4 = frappe.db.get_all("Account", filters=filters_4, pluck="name")
-	accounts.extend(additional_4)
-	print(f"Accounts: {accounts}")
 	return list(set(accounts))
 
 
