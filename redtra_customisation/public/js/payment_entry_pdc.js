@@ -2,26 +2,19 @@ frappe.ui.form.on('Payment Entry', {
 	refresh: function(frm) {
 		// Show/hide PDC actions based on cheque status
 		if (frm.doc.mode_of_payment && frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
+			if ( frm.doc.custom_is_pdc_entry == 1) {
+				return;
+			}
 			setup_pdc_actions(frm);
 		}
 	},
 	
 	mode_of_payment: function(frm) {
-		// Auto-set posting date to cheque date for PDC
-		if (frm.doc.mode_of_payment && frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
-			if (frm.doc.pdc_cheque_date && frm.doc.pdc_cheque_date > frm.doc.posting_date) {
-				frm.set_value('posting_date', frm.doc.pdc_cheque_date);
-			}
-		}
+		// Auto-set posting date removed as per user request
 	},
 	
 	pdc_cheque_date: function(frm) {
-		// Auto-set posting date to cheque date for PDC
-		if (frm.doc.mode_of_payment && frm.doc.mode_of_payment.toLowerCase().includes('cheque')) {
-			if (frm.doc.pdc_cheque_date && frm.doc.pdc_cheque_date > frm.doc.posting_date) {
-				frm.set_value('posting_date', frm.doc.pdc_cheque_date);
-			}
-		}
+		// Auto-set posting date removed as per user request
 	}
 });
 

@@ -1,0 +1,20 @@
+{
+ "app": "redtra_customisation",
+ "bg_color": "gray",
+ "creation": "2026-04-19 18:19:08.124227",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "PDC Cheque",
+ "link_to": "PDC Cheque",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-04-19 19:18:22.030262",
+ "modified_by": "Administrator",
+ "name": "PDC Cheque",
+ "owner": "Administrator",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

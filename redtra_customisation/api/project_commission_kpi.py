@@ -11,6 +11,51 @@ def _empty_totals():
 	}
 
 
+def _get_boq_commission_accounts(company):
+	if not company or not frappe.db.exists("DocType", "BOQ Settings"):
+		return {}
+	return frappe.db.get_value(
+		"BOQ Settings",
+		company,
+		["sales_person_commission_account", "sales_partner_commission_account"],
+		as_dict=True,
+	) or {}
+
+
+def _get_gl_commission_total(project, company, account, from_date=None, to_date=None, is_partner=False):
+	if not (project and company and account):
+		return 0
+
+	accounts = [account]
+
+
+	conditions = [
+		"gle.project = %(project)s",
+		"gle.company = %(company)s",
+		"gle.account IN %(accounts)s",
+		"gle.is_cancelled = 0",
+		"gle.voucher_type = 'Journal Entry'",
+	]
+	args = {"project": project, "company": company, "accounts": accounts}
+	if from_date:
+		conditions.append("gle.posting_date >= %(from_date)s")
+		args["from_date"] = from_date
+	if to_date:
+		conditions.append("gle.posting_date <= %(to_date)s")
+		args["to_date"] = to_date
+
+	return flt(
+		frappe.db.sql(
+			f"""
+			SELECT COALESCE(SUM(gle.debit - gle.credit), 0)
+			FROM `tabGL Entry` gle
+			WHERE {' AND '.join(conditions)}
+			""",
+			args,
+		)[0][0]
+	)
+
+
 @frappe.whitelist()
 def get_project_commission_totals(project=None) -> dict:
 	"""
@@ -26,19 +71,9 @@ def get_project_commission_totals(project=None) -> dict:
 	if not company:
 		return _empty_totals()
 
-	today_d = today()
+	# Removing date filters to show "whole" project total as requested
 	from_date = None
-	to_date = today_d
-
-	try:
-		from erpnext.accounts.utils import get_fiscal_year
-
-		fy = get_fiscal_year(date=today_d, company=company, raise_on_missing=False)
-		if fy:
-			from_date, fy_end = fy[1], fy[2]
-			to_date = today_d if str(today_d) <= str(fy_end) else fy_end
-	except Exception:
-		pass
+	to_date = None
 
 	base_filters = {
 		"company": company,
@@ -73,6 +108,24 @@ def get_project_commission_totals(project=None) -> dict:
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Sales Partner commission KPI")
 		sales_partner_total = 0.0
+
+	commission_accounts = _get_boq_commission_accounts(company)
+	sales_person_total += _get_gl_commission_total(
+		project,
+		company,
+		commission_accounts.get("sales_person_commission_account"),
+		from_date,
+		to_date,
+		is_partner=False,
+	)
+	sales_partner_total += _get_gl_commission_total(
+		project,
+		company,
+		commission_accounts.get("sales_partner_commission_account"),
+		from_date,
+		to_date,
+		is_partner=True,
+	)
 
 	return {
 		"sales_person_commission_total": flt(sales_person_total),

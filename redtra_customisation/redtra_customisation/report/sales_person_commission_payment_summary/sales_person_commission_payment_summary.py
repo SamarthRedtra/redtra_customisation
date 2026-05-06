@@ -10,6 +10,7 @@ ALLOWED_DOCTYPES = {
 	"Sales Order": "transaction_date",
 	"Delivery Note": "posting_date",
 	"Sales Invoice": "posting_date",
+	"Journal Entry": "posting_date",
 }
 
 
@@ -127,6 +128,9 @@ def get_columns(filters):
 
 
 def get_entries(filters):
+	if filters["doc_type"] == "Journal Entry":
+		return get_journal_entries(filters)
+
 	dt = qb.DocType(filters["doc_type"])
 	st = qb.DocType("Sales Team")
 	sp = qb.DocType("Sales Person")
@@ -168,6 +172,83 @@ def get_entries(filters):
 		entry.create_payment_entry = ""
 
 	return entries
+
+
+def get_journal_entries(filters):
+	company = filters.get("company")
+	if not company:
+		return []
+
+	commission_accounts = _get_commission_accounts(company)
+	if not commission_accounts:
+		return []
+
+	conditions = [
+		"gle.docstatus = 1",
+		"gle.is_cancelled = 0",
+		"gle.company = %(company)s",
+		"gle.voucher_type = 'Journal Entry'",
+		"gle.account IN %(accounts)s",
+	]
+	args = {"company": company, "accounts": commission_accounts}
+
+	for field in ("from_date", "to_date", "project"):
+		value = filters.get(field)
+		if not value:
+			continue
+		if field == "from_date":
+			conditions.append("gle.posting_date >= %(from_date)s")
+		elif field == "to_date":
+			conditions.append("gle.posting_date <= %(to_date)s")
+		else:
+			conditions.append("gle.project = %(project)s")
+		args[field] = value
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			gle.voucher_no AS source_name,
+			gle.posting_date,
+			gle.company,
+			gle.project,
+			gle.party AS employee,
+			(gle.debit - gle.credit) AS commission_amount
+		FROM `tabGL Entry` gle
+		WHERE {' AND '.join(conditions)}
+			AND ABS(gle.debit - gle.credit) > 0
+		ORDER BY gle.posting_date DESC, gle.voucher_no DESC
+		""",
+		args,
+		as_dict=True,
+	)
+
+	for row in rows:
+		row.source_doctype = "Journal Entry"
+		row.customer = None
+		row.territory = None
+		row.amount = row.commission_amount
+		row.sales_person = None
+		row.contribution_percentage = 0
+		row.commission_rate = 0
+		row.contribution_amount = row.commission_amount
+		row.employee_name = (
+			frappe.db.get_value("Employee", row.employee, "employee_name")
+			if row.employee
+			else None
+		)
+		row.create_payment_entry = ""
+
+	return rows
+
+
+def _get_commission_accounts(company):
+	accounts = []
+	if frappe.db.exists("DocType", "BOQ Settings"):
+		acc = frappe.db.get_value("BOQ Settings", company, "sales_person_commission_account")
+		if acc:
+			accounts.append(acc)
+
+	return list(set(accounts))
 
 
 def get_conditions(dt, st, filters, date_field):

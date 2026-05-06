@@ -9,6 +9,7 @@
     "default_employee",
     "enble_purchase_reorder",
     "create_pdc_directly_under_collection",
+    "pdc_auto_submit_payment_entry",
     "service_item_section",
     "service_item_account_mandatory",
     "commission_settings",
@@ -44,6 +45,13 @@
       "fieldname": "create_pdc_directly_under_collection",
       "fieldtype": "Check",
       "label": "Create PDC Directly Under Collection"
+    },
+    {
+      "default": "0",
+      "fieldname": "pdc_auto_submit_payment_entry",
+      "fieldtype": "Check",
+      "label": "Auto Submit Payment Entry on PDC Conversion",
+      "description": "If enabled, the conversion tool will submit the created Payment Entry automatically; otherwise it will remain Draft."
     },
     {
       "fieldname": "service_item_section",

@@ -56,8 +56,12 @@ doctype_js = {
 	"Sales Order": "public/js/sales_order_commission.js",
 	"Supplier": "public/js/supplier_pdc_dashboard.js",
 	"Shift Type": "rhr/doctype/shift_type/shift_type.js",
+	"Post Dated Cheques Tool": "redtra_customisation/doctype/post_dated_cheques_tool/post_dated_cheques_tool.js",
+	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques.js",
 }
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {
+	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques_list.js",
+}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 doctype_tree_js = {"Account" : "public/js/account_tree.js",
                    }
@@ -147,6 +151,7 @@ after_migrate = "redtra_customisation.pdc.install.after_migrate"
 override_doctype_class = {
 	"BOM Creator": "redtra_customisation.override.bom_creator.CustomBOMCreator",
 	"Payment Entry": "redtra_customisation.pdc.payment_entry_override.CustomPaymentEntry",
+	"Payroll Entry": "redtra_customisation.rpayroll.doctype.payroll_entry.payroll_entry.CustomPayrollEntry",
 	"Salary Slip": "redtra_customisation.rpayroll.doctype.salary_slip.salary_slip_overtime.SalarySlipOvertime",
 	"Shift Type": "redtra_customisation.rhr.doctype.shift_type.shift_type.ShiftType",
 }
@@ -178,12 +183,15 @@ doc_events = {
  "Stock Entry": {
     "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
  },
- "Sales Invoice": {
-    "validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
- },
- "Sales Person": {
-    "validate": "redtra_customisation.redtra_customisation.custom.sales_person.validate_slabs"
- }
+	"Sales Invoice": {
+		"validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
+	},
+	"Sales Person": {
+		"validate": "redtra_customisation.redtra_customisation.custom.sales_person.validate_slabs"
+	},
+	"Workflow Action": {
+		"after_insert": "redtra_customisation.pdc.workflow_notifications.send_workflow_system_notification"
+	}
 }
 
 # Scheduled Tasks

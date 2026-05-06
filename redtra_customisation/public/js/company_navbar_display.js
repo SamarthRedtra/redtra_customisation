@@ -59,7 +59,7 @@ class CompanyNavbarDisplay {
 		// Find the navbar
 		const navbar = document.querySelector('.navbar-nav') || document.querySelector('.navbar');
 		if (!navbar) {
-			console.warn('Navbar not found, retrying...');
+			
 			setTimeout(() => this.createDisplayElement(), 500);
 			return;
 		}

@@ -22,16 +22,8 @@ class CustomPaymentEntry(PaymentEntry):
 		if not self.is_cheque_payment():
 			return
 
-		if not self.pdc_cheque_number:
-			frappe.throw(_("Cheque Number is mandatory for cheque payments"))
-
-		if not self.pdc_cheque_date:
-			frappe.throw(_("Cheque Date is mandatory for cheque payments"))
-
-		# For post-dated cheques, set posting date to cheque date
-		if getdate(self.pdc_cheque_date) > getdate(self.posting_date):
-			# Allow posting date to be set to cheque date for PDC
-			pass
+		# Cheque validations removed as per user request
+		pass
 
 	def is_cheque_payment(self):
 		"""Check if payment mode is cheque"""
@@ -40,7 +32,7 @@ class CustomPaymentEntry(PaymentEntry):
 		
 		try:
 			# Check if mode name contains "cheque" (case insensitive)
-			if "cheque" in self.mode_of_payment.lower():
+			if "cheque" in self.mode_of_payment.lower() and hasattr(self, "custom_is_pdc_entry") and self.custom_is_pdc_entry == 0:
 				return True
 			
 			# Also check mode of payment configuration
@@ -58,11 +50,8 @@ class CustomPaymentEntry(PaymentEntry):
 		return False
 
 	def before_save(self):
-		"""Set posting date to cheque date for PDC"""
-		if self.is_cheque_payment() and self.pdc_cheque_date:
-			# For post-dated cheques, set posting date to cheque date
-			if getdate(self.pdc_cheque_date) > getdate(self.posting_date):
-				self.posting_date = self.pdc_cheque_date
+		"""Set posting date removed as per user request"""
+		# Posting date automation removed
 
 		# Set initial status only on new records
 		if self.is_new() and self.is_cheque_payment() and not self.pdc_cheque_status:
@@ -94,20 +83,7 @@ class CustomPaymentEntry(PaymentEntry):
 			target_account = pdc_settings.pdc_received_account if self.payment_type == "Receive" else pdc_settings.pdc_issued_account
 			account_label = "PDC Received Account" if self.payment_type == "Receive" else "PDC Issued Account"
 
-		if self.payment_type == "Receive":
-			# For received cheques: Debit Check Account, Credit AR
-			if self.paid_from != target_account:
-				frappe.msgprint(_(
-					"Please ensure Paid From account is set to {0} "
-					"for cheque payments"
-				).format(account_label), alert=True)
-		else:
-			# For issued cheques: Credit Check Account, Debit AP
-			if self.paid_to != target_account:
-				frappe.msgprint(_(
-					"Please ensure Paid To account is set to {0} "
-					"for cheque payments"
-				).format(account_label), alert=True)
+		# Account warnings removed as per user request
 		
 		if custom_settings.create_pdc_directly_under_collection:
 			self.pdc_cheque_status = "Issued"
