@@ -101,6 +101,12 @@ def get_columns(filters):
 			"width": 110,
 		},
 		{
+			"label": _("User Remarks"),
+			"fieldname": "user_remark",
+			"fieldtype": "Data",
+			"width": 200,
+		},
+		{
 			"label": _("Commission Rate %"),
 			"fieldname": "commission_rate",
 			"fieldtype": "Percent",
@@ -212,8 +218,10 @@ def get_journal_entries(filters):
 			gle.company,
 			gle.project,
 			gle.party AS employee,
+			je.user_remark,
 			(gle.debit - gle.credit) AS commission_amount
 		FROM `tabGL Entry` gle
+		LEFT JOIN `tabJournal Entry` je ON je.name = gle.voucher_no
 		WHERE {' AND '.join(conditions)}
 			AND ABS(gle.debit - gle.credit) > 0
 		ORDER BY gle.posting_date DESC, gle.voucher_no DESC
