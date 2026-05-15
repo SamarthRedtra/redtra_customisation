@@ -232,7 +232,12 @@ def get_journal_entries(filters):
 			(gle.debit - gle.credit) AS commission_amount
 		FROM `tabGL Entry` gle
 		LEFT JOIN `tabJournal Entry` je ON je.name = gle.voucher_no
-		LEFT JOIN `tabJournal Entry Account` jea ON jea.name = gle.voucher_detail_no
+		LEFT JOIN `tabJournal Entry Account` jea
+			ON jea.parent = gle.voucher_no
+			AND jea.account = gle.account
+			AND jea.debit = gle.debit
+			AND jea.credit = gle.credit
+			AND COALESCE(jea.project, '') = COALESCE(gle.project, '')
 		WHERE {' AND '.join(conditions)}
 			AND ABS(gle.debit - gle.credit) > 0
 		ORDER BY gle.posting_date DESC, gle.voucher_no DESC
