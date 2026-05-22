@@ -17,6 +17,11 @@ def calculate_profit_and_commission(doc, method):
 	Uses ERPNext Gross Profit report logic for consistency with the report.
 	"""
 	calculate_profit_percentage(doc)
+	# Skip automatic commission override on submitted invoices so that
+	# manually edited commission_rate / incentives values are preserved
+	# when updating after submit.
+	if doc.docstatus == 1:
+		return
 	calculate_commission(doc)
 
 
@@ -375,7 +380,10 @@ def _build_commission_preview(doc, settings=None):
 	rows = []
 
 	for row in doc.sales_team:
-		if is_sales_based:
+		manual_commission_rate = flt(row.get("commission_rate"))
+		if manual_commission_rate > 0:
+			commission_rate = manual_commission_rate
+		elif is_sales_based:
 			commission_rate = customer_commission
 		elif project_commission_rate is not None:
 			commission_rate = project_commission_rate

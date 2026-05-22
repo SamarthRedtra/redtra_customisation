@@ -32,6 +32,49 @@ function set_bank_account_query(frm) {
 	});
 }
 
+function get_pdc_invoice_doctype(frm) {
+	return frm.doc.party_type === "Supplier" || frm.doc.payment_type === "Pay"
+		? "Purchase Invoice"
+		: "Sales Invoice";
+}
+
+function render_invoice_links(frm) {
+	const wrapper = frm.fields_dict.invoice_links_html?.$wrapper;
+	const display = frm.fields_dict.invoice_links?.$wrapper;
+
+	const links = (frm.doc.invoice_links || "")
+		.split(",")
+		.map(v => v.trim())
+		.filter(Boolean);
+
+	if (!links.length) {
+		if (wrapper) {
+			wrapper.html("");
+		}
+		return;
+	}
+
+	const invoice_doctype = get_pdc_invoice_doctype(frm);
+	const invoice_route = frappe.router.slug(invoice_doctype);
+	const inline_html = links.map(name => {
+		const route = `/app/${invoice_route}/${encodeURIComponent(name)}`;
+		return `<a href="${route}">${frappe.utils.escape_html(name)}</a>`;
+	}).join(", ");
+	const button_html = links.map(name => {
+		const route = `/app/${invoice_route}/${encodeURIComponent(name)}`;
+		return `<a class="btn btn-xs btn-default" style="margin: 0 6px 6px 0;" href="${route}">
+			<i class="fa fa-external-link"></i> ${frappe.utils.escape_html(name)}
+		</a>`;
+	}).join("");
+
+	if (display) {
+		display.find(".control-value").html(inline_html);
+	}
+	if (wrapper) {
+		wrapper.html(`<div class="pdc-invoice-links">${button_html}</div>`);
+	}
+}
+
 frappe.ui.form.on("Post Dated Cheques", {
 	setup(frm) {
 		set_bank_account_query(frm);
@@ -41,6 +84,7 @@ frappe.ui.form.on("Post Dated Cheques", {
 	},
 	refresh(frm) {
 		set_bank_account_query(frm);
+		render_invoice_links(frm);
 
 		if (frm.doc.docstatus === 0) {
 			frm.add_custom_button(__("Fetch Invoices"), () => {
@@ -161,12 +205,12 @@ frappe.ui.form.on("Post Dated Cheques", {
 		const is_purchase_invoice = frm.doc.party_type !== "Customer";
 		const target_doctype = is_purchase_invoice ? "Purchase Invoice" : "Sales Invoice";
 		const party_field = frm.doc.party_type === "Customer" ? "customer" : "supplier";
-		const fil = [
-			["docstatus", "=", 1],
-			["company", "=", frm.doc.company],
-			[party_field, "=", frm.doc.party],
-			["outstanding_amount", ">", 0]
-		];
+		const invoice_query_filters = {
+			reference_doctype: target_doctype,
+			company: frm.doc.company,
+			party: frm.doc.party,
+			current_pdc: frm.doc.name
+		};
 
 		const dialog = new frappe.ui.form.MultiSelectDialog({
 			doctype: target_doctype,
@@ -191,33 +235,20 @@ frappe.ui.form.on("Post Dated Cheques", {
 				}
 			],
 			get_query() {
-				if (is_purchase_invoice) {
-					return {
-						query: "redtra_customisation.redtra_customisation.doctype.post_dated_cheques.post_dated_cheques.search_purchase_invoice_for_pdc",
-						filters: {
-							company: frm.doc.company,
-							supplier: frm.doc.party
-						}
-					};
-				}
 				return {
-					filters: fil
+					query: "redtra_customisation.redtra_customisation.doctype.post_dated_cheques.post_dated_cheques.search_invoice_for_pdc",
+					filters: invoice_query_filters
 				};
 			},
 			action(selections) {
 				if (!selections.length) return;
 
-				// Properly merge array filters
-				const fetch_filters = [...fil, ["name", "in", selections]];
-
 				frappe.call({
-					method: "frappe.client.get_list",
+					method: "redtra_customisation.redtra_customisation.doctype.post_dated_cheques.post_dated_cheques.get_pdc_invoice_details",
 					args: {
-						doctype: target_doctype,
-						filters: fetch_filters,
-						fields: is_purchase_invoice
-							? ["name", "custom_supplier_invoice_no", "grand_total", "outstanding_amount"]
-							: ["name", "grand_total", "outstanding_amount"]
+						reference_doctype: target_doctype,
+						invoices: selections,
+						current_pdc: frm.doc.name
 					},
 					callback(r) {
 						if (r.message) {

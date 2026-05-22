@@ -30,6 +30,9 @@
   "reference_date",
   "section_break_amount",
   "invoice_references",
+  "invoice_links",
+  "invoice_links_html",
+  "invoice_links_list",
   "column_break_references",
   "amount",
   "account_currency",
@@ -180,6 +183,28 @@
    "options": "PDC Invoice Reference"
   },
   {
+   "allow_on_submit": 1,
+   "fieldname": "invoice_links",
+   "fieldtype": "Small Text",
+   "label": "Invoices",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "invoice_links_html",
+   "fieldtype": "HTML",
+   "label": "Invoice Links"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "invoice_links_list",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Invoices",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
    "fieldname": "column_break_references",
    "fieldtype": "Column Break"
   },
@@ -260,7 +285,7 @@
  "idx": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-20 22:20:56.701929",
+ "modified": "2026-05-22 18:46:17.348651",
  "modified_by": "Administrator",
  "module": "Redtra Customisation",
  "name": "Post Dated Cheques",

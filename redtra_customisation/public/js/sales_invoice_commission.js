@@ -23,6 +23,12 @@ const setChildIfChanged = (row, fieldname, value) => {
 };
 
 const update_project_commission_preview = (frm) => {
+	// Skip automatic commission preview on submitted invoices so that
+	// manually edited commission_rate / incentives values are preserved.
+	if (frm.doc.docstatus === 1) {
+		return;
+	}
+
 	if (!frm.doc.sales_team || !frm.doc.sales_team.length) {
 		return;
 	}
@@ -109,6 +115,9 @@ frappe.ui.form.on("Sales Invoice", {
 
 frappe.ui.form.on("Sales Team", {
 	sales_person(frm) {
+		update_project_commission_preview(frm);
+	},
+	commission_rate(frm) {
 		update_project_commission_preview(frm);
 	},
 	allocated_amount(frm) {
