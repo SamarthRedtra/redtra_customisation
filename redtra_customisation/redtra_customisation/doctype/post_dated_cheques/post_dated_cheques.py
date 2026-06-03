@@ -4,6 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import flt
 
 
 class PostDatedCheques(Document):
@@ -45,24 +46,62 @@ class PostDatedCheques(Document):
 		self.invoice_links_list = ", ".join(summary)
 
 	def validate_invoice_references_not_reused(self):
-		"""Prevent one active invoice from being issued on multiple PDCs."""
+		"""Ensure total PDC allocation per invoice does not exceed invoice outstanding."""
+		allocated_in_doc = {}
 		for row in self.get("invoice_references") or []:
 			if not row.reference_doctype or not row.reference_name:
 				continue
 
-			existing = get_existing_pdc_for_invoice(
+			key = (row.reference_doctype, row.reference_name)
+			allocated_in_doc[key] = allocated_in_doc.get(key, 0) + flt(row.allocated_amount)
+
+			remaining = get_remaining_pdc_allocatable(
 				row.reference_doctype,
 				row.reference_name,
 				exclude_pdc=self.name if not self.is_new() else None,
 			)
-			if existing:
+			if flt(row.allocated_amount) > remaining + 0.01:
+				existing_pdc = get_existing_pdc_for_invoice(
+					row.reference_doctype,
+					row.reference_name,
+					exclude_pdc=self.name if not self.is_new() else None,
+				)
+				if existing_pdc and remaining <= 0:
+					frappe.throw(
+						_("{0} {1} is already fully allocated on active PDC {2}.").format(
+							_(row.reference_doctype),
+							frappe.bold(row.reference_name),
+							frappe.bold(existing_pdc),
+						),
+						title=_("Invoice Already Used in PDC"),
+					)
 				frappe.throw(
-					_("{0} {1} is already linked to active PDC {2}.").format(
+					_(
+						"Allocated amount {0} for {1} {2} exceeds remaining PDC allocatable amount {3}."
+					).format(
+						frappe.bold(flt(row.allocated_amount)),
 						_(row.reference_doctype),
 						frappe.bold(row.reference_name),
-						frappe.bold(existing),
+						frappe.bold(remaining),
 					),
-					title=_("Invoice Already Used in PDC"),
+					title=_("PDC Allocation Exceeds Outstanding"),
+				)
+
+		for (reference_doctype, reference_name), total_allocated in allocated_in_doc.items():
+			outstanding = flt(
+				frappe.db.get_value(reference_doctype, reference_name, "outstanding_amount")
+			)
+			if total_allocated > outstanding + 0.01:
+				frappe.throw(
+					_(
+						"Total allocated amount {0} for {1} {2} cannot exceed invoice outstanding {3}."
+					).format(
+						frappe.bold(total_allocated),
+						_(reference_doctype),
+						frappe.bold(reference_name),
+						frappe.bold(outstanding),
+					),
+					title=_("PDC Allocation Exceeds Outstanding"),
 				)
 
 	def _get_linked_payment_entries(self):
@@ -119,6 +158,69 @@ def get_existing_pdc_for_invoice(reference_doctype, reference_name, exclude_pdc=
 	return active[0] if active else None
 
 
+def get_active_pdc_allocated_amount(reference_doctype, reference_name, exclude_pdc=None):
+	"""Sum allocated_amount on active (non-cancelled) PDCs for an invoice."""
+	filters = {
+		"reference_doctype": reference_doctype,
+		"reference_name": reference_name,
+	}
+	if exclude_pdc:
+		filters["parent"] = ["!=", exclude_pdc]
+
+	rows = frappe.get_all(
+		"PDC Invoice Reference",
+		filters=filters,
+		fields=["parent", "allocated_amount"],
+	)
+	if not rows:
+		return 0.0
+
+	parent_names = list({row.parent for row in rows})
+	active_parents = set(
+		frappe.get_all(
+			"Post Dated Cheques",
+			filters={
+				"name": ["in", parent_names],
+				"docstatus": ["!=", 2],
+				"status": ["!=", "Cancelled"],
+			},
+			pluck="name",
+		)
+		or []
+	)
+
+	return sum(
+		flt(row.allocated_amount)
+		for row in rows
+		if row.parent in active_parents
+	)
+
+
+def get_remaining_pdc_allocatable(reference_doctype, reference_name, exclude_pdc=None):
+	"""Outstanding invoice amount not yet reserved on other active PDCs."""
+	outstanding = flt(
+		frappe.db.get_value(reference_doctype, reference_name, "outstanding_amount")
+	)
+	already_allocated = get_active_pdc_allocated_amount(
+		reference_doctype, reference_name, exclude_pdc=exclude_pdc
+	)
+	return max(0.0, outstanding - already_allocated)
+
+
+def _active_pdc_allocation_subquery(current_pdc=""):
+	"""SQL fragment: sum of allocated amounts on other active PDCs for the same invoice."""
+	return """
+		COALESCE((
+			SELECT SUM(ref.allocated_amount)
+			FROM `tabPDC Invoice Reference` ref
+			INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
+			WHERE ref.reference_doctype = %(reference_doctype)s
+				AND ref.reference_name = inv.name
+				AND pdc.docstatus != 2
+				AND IFNULL(pdc.status, '') != 'Cancelled'
+				AND (%(current_pdc)s = '' OR pdc.name != %(current_pdc)s)
+		), 0)
+	"""
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def search_purchase_invoice_for_pdc(doctype, txt, searchfield, start, page_len, filters):
@@ -203,27 +305,21 @@ def search_invoice_for_pdc(doctype, txt, searchfield, start, page_len, filters):
 		"page_len": page_len,
 	}
 
+	allocation_subquery = _active_pdc_allocation_subquery()
+
 	query = f"""
 		SELECT
 			inv.name,
 			{supplier_invoice_expr if reference_doctype == "Purchase Invoice" else "''"} AS custom_supplier_invoice_no,
 			inv.grand_total,
-			inv.outstanding_amount
+			inv.outstanding_amount,
+			(inv.outstanding_amount - {allocation_subquery}) AS remaining_allocatable
 		FROM `tab{reference_doctype}` inv
 		WHERE inv.docstatus = 1
 			AND inv.company = %(company)s
 			AND inv.{party_field} = %(party)s
 			AND inv.outstanding_amount > 0
-			AND NOT EXISTS (
-				SELECT 1
-				FROM `tabPDC Invoice Reference` ref
-				INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
-				WHERE ref.reference_doctype = %(reference_doctype)s
-					AND ref.reference_name = inv.name
-					AND pdc.docstatus != 2
-					AND IFNULL(pdc.status, '') != 'Cancelled'
-					AND (%(current_pdc)s = '' OR pdc.name != %(current_pdc)s)
-			)
+			AND (inv.outstanding_amount - {allocation_subquery}) > 0.009
 	"""
 	values["reference_doctype"] = reference_doctype
 
@@ -256,27 +352,11 @@ def get_pdc_invoice_details(reference_doctype, invoices, current_pdc=None):
 	if reference_doctype not in ("Sales Invoice", "Purchase Invoice") or not invoices:
 		return []
 
-	for invoice in invoices:
-		existing = get_existing_pdc_for_invoice(
-			reference_doctype,
-			invoice,
-			exclude_pdc=current_pdc,
-		)
-		if existing:
-			frappe.throw(
-				_("{0} {1} is already linked to active PDC {2}.").format(
-					_(reference_doctype),
-					frappe.bold(invoice),
-					frappe.bold(existing),
-				),
-				title=_("Invoice Already Used in PDC"),
-			)
-
 	fields = ["name", "grand_total", "outstanding_amount"]
 	if reference_doctype == "Purchase Invoice":
 		fields.append("custom_supplier_invoice_no")
 
-	return frappe.get_all(
+	rows = frappe.get_all(
 		reference_doctype,
 		filters={
 			"name": ["in", invoices],
@@ -286,5 +366,25 @@ def get_pdc_invoice_details(reference_doctype, invoices, current_pdc=None):
 		fields=fields,
 		order_by="posting_date desc, name desc",
 	)
+
+	result = []
+	for row in rows:
+		remaining = get_remaining_pdc_allocatable(
+			reference_doctype,
+			row.name,
+			exclude_pdc=current_pdc,
+		)
+		if remaining <= 0:
+			frappe.throw(
+				_("{0} {1} has no remaining amount available for PDC allocation.").format(
+					_(reference_doctype),
+					frappe.bold(row.name),
+				),
+				title=_("Invoice Fully Allocated on PDC"),
+			)
+		row["remaining_allocatable"] = remaining
+		result.append(row)
+
+	return result
 
 

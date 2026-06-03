@@ -253,12 +253,13 @@ frappe.ui.form.on("Post Dated Cheques", {
 					callback(r) {
 						if (r.message) {
 							r.message.forEach(d => {
+								const remaining = flt(d.remaining_allocatable ?? d.outstanding_amount);
 								const row = frm.add_child("invoice_references");
 								row.reference_doctype = target_doctype;
 								row.reference_name = d.name;
 								row.total_amount = d.grand_total;
 								row.outstanding_amount = d.outstanding_amount;
-								row.allocated_amount = d.outstanding_amount;
+								row.allocated_amount = remaining;
 							});
 
 							calculate_total_amount(frm);
