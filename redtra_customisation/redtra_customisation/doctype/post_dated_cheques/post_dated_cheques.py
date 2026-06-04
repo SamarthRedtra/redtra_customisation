@@ -10,7 +10,25 @@ from frappe.utils import flt
 class PostDatedCheques(Document):
 	def validate(self):
 		self.set_invoice_links()
+		self.validate_pdc_amount_vs_allocations()
 		self.validate_invoice_references_not_reused()
+
+	def validate_pdc_amount_vs_allocations(self):
+		"""Cheque amount must cover invoice allocations; warn when rows exceed cheque."""
+		total_allocated = sum(flt(row.allocated_amount) for row in self.get("invoice_references") or [])
+		if not total_allocated:
+			return
+		if flt(self.amount) <= 0:
+			frappe.throw(_("PDC Amount must be greater than zero when invoices are linked."))
+		if total_allocated > flt(self.amount) + 0.01:
+			frappe.msgprint(
+				_(
+					"Total allocated on invoices ({0}) exceeds cheque amount ({1}). "
+					"Only the cheque amount is reserved until conversion; adjust allocated amounts."
+				).format(total_allocated, self.amount),
+				indicator="orange",
+				title=_("Allocation Exceeds Cheque Amount"),
+			)
 
 	def before_cancel(self):
 		"""Cancel submitted Payment Entries linked to this PDC."""
@@ -158,8 +176,20 @@ def get_existing_pdc_for_invoice(reference_doctype, reference_name, exclude_pdc=
 	return active[0] if active else None
 
 
+def _effective_pdc_line_allocation(allocated_amount, parent_pdc_amount, parent_total_allocated):
+	"""Reserve only what the cheque actually covers when row amounts exceed PDC amount."""
+	allocated_amount = flt(allocated_amount)
+	parent_pdc_amount = flt(parent_pdc_amount)
+	parent_total_allocated = flt(parent_total_allocated)
+	if parent_total_allocated <= 0:
+		return 0.0
+	if parent_total_allocated > parent_pdc_amount and parent_pdc_amount > 0:
+		return allocated_amount * (parent_pdc_amount / parent_total_allocated)
+	return allocated_amount
+
+
 def get_active_pdc_allocated_amount(reference_doctype, reference_name, exclude_pdc=None):
-	"""Sum allocated_amount on active (non-cancelled) PDCs for an invoice."""
+	"""Effective amount reserved on active PDCs (capped by each PDC cheque amount)."""
 	filters = {
 		"reference_doctype": reference_doctype,
 		"reference_name": reference_name,
@@ -188,12 +218,37 @@ def get_active_pdc_allocated_amount(reference_doctype, reference_name, exclude_p
 		)
 		or []
 	)
+	if not active_parents:
+		return 0.0
 
-	return sum(
-		flt(row.allocated_amount)
-		for row in rows
-		if row.parent in active_parents
-	)
+	parent_totals = {}
+	for parent in active_parents:
+		all_refs = frappe.get_all(
+			"PDC Invoice Reference",
+			filters={"parent": parent},
+			fields=["allocated_amount"],
+		)
+		parent_totals[parent] = sum(flt(r.allocated_amount) for r in all_refs)
+
+	pdc_amounts = {
+		row.name: flt(row.amount)
+		for row in frappe.get_all(
+			"Post Dated Cheques",
+			filters={"name": ["in", list(active_parents)]},
+			fields=["name", "amount"],
+		)
+	}
+
+	total_effective = 0.0
+	for row in rows:
+		if row.parent not in active_parents:
+			continue
+		total_effective += _effective_pdc_line_allocation(
+			row.allocated_amount,
+			pdc_amounts.get(row.parent, 0),
+			parent_totals.get(row.parent, 0),
+		)
+	return total_effective
 
 
 def get_remaining_pdc_allocatable(reference_doctype, reference_name, exclude_pdc=None):
@@ -207,13 +262,26 @@ def get_remaining_pdc_allocatable(reference_doctype, reference_name, exclude_pdc
 	return max(0.0, outstanding - already_allocated)
 
 
-def _active_pdc_allocation_subquery(current_pdc=""):
-	"""SQL fragment: sum of allocated amounts on other active PDCs for the same invoice."""
+def _active_pdc_allocation_subquery():
+	"""SQL fragment: effective reserved amount on other active PDCs (prorated by cheque amount)."""
 	return """
 		COALESCE((
-			SELECT SUM(ref.allocated_amount)
+			SELECT SUM(
+				CASE
+					WHEN pdc_totals.total_alloc > IFNULL(pdc.amount, 0)
+						AND pdc_totals.total_alloc > 0
+						AND IFNULL(pdc.amount, 0) > 0
+					THEN ref.allocated_amount * pdc.amount / pdc_totals.total_alloc
+					ELSE ref.allocated_amount
+				END
+			)
 			FROM `tabPDC Invoice Reference` ref
 			INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
+			INNER JOIN (
+				SELECT parent, SUM(allocated_amount) AS total_alloc
+				FROM `tabPDC Invoice Reference`
+				GROUP BY parent
+			) pdc_totals ON pdc_totals.parent = ref.parent
 			WHERE ref.reference_doctype = %(reference_doctype)s
 				AND ref.reference_name = inv.name
 				AND pdc.docstatus != 2
