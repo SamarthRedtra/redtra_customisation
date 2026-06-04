@@ -53,7 +53,7 @@
    "fieldname": "journal_naming_series",
    "fieldtype": "Select",
    "label": "Series",
-   "options": "ACC-JV-.YYYY.-",
+   "options": "ACC-JV-.YYYY.-\nACC-JVPAY-.YYYY.-\nACC-REC-.YYYY.-\nACC-BANK-.YYYY.-\nACC-CASH-.YYYY.-\nACC-DN-.YYYY.-\nACC-CN-.YYYY.-\nP-V-.YYYY.-\nR-V-.YYYY.-",
    "reqd": 1
   },
   {
@@ -260,7 +260,7 @@
  "idx": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-02 10:00:00",
+ "modified": "2026-06-05 00:08:52.346040",
  "modified_by": "Administrator",
  "module": "Redtra Customisation",
  "name": "Cash Bank Entry",
@@ -313,6 +313,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
