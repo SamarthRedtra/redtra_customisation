@@ -17,7 +17,11 @@
     "sales_partner_comssion_percentage",
     "project_commission_section",
     "enable_project_wise_commission",
-    "project_commission_slabs"
+    "project_commission_slabs",
+    "purchase_order_section",
+    "restrict_non_stockable_item_user",
+    "purchase_invoice_section",
+    "allow_any_account_on_purchase_invoice"
   ],
   "fields": [
     {
@@ -101,6 +105,30 @@
       "fieldtype": "Table",
       "label": "Project Commission Slabs",
       "options": "Project Commission Slab"
+    },
+    {
+      "fieldname": "purchase_order_section",
+      "fieldtype": "Section Break",
+      "label": "Purchase Order"
+    },
+    {
+      "fieldname": "restrict_non_stockable_item_user",
+      "fieldtype": "Table",
+      "label": "Restrict Non Stockable Item Users",
+      "options": "Restrict Non Stockable Item User",
+      "description": "Users listed here can only view and create non-stock Purchase Orders (Is Non Stock)."
+    },
+    {
+      "fieldname": "purchase_invoice_section",
+      "fieldtype": "Section Break",
+      "label": "Purchase Invoice"
+    },
+    {
+      "default": "0",
+      "fieldname": "allow_any_account_on_purchase_invoice",
+      "fieldtype": "Check",
+      "label": "Allow Any Account on Purchase Invoice Expense Head",
+      "description": "When enabled, users can select any non-group account for the company on PI item Expense Head (Asset, Liability, Equity, Income, or Expense)."
     }
   ],
   "index_web_pages_for_search": 1,

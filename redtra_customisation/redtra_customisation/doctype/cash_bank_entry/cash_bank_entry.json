@@ -1,0 +1,320 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 10:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "journal_naming_series",
+  "company",
+  "posting_date",
+  "entry_type",
+  "account_type",
+  "column_break_header",
+  "status",
+  "settlement_mode",
+  "mode_of_payment",
+  "section_break_account",
+  "paid_account",
+  "paid_account_currency",
+  "paid_account_exchange_rate",
+  "multi_currency",
+  "column_break_ref_header",
+  "reference",
+  "reference_date",
+  "section_break_dims",
+  "project",
+  "cost_center",
+  "department",
+  "section_break_lines",
+  "accounts",
+  "section_break_totals",
+  "amount",
+  "user_remark",
+  "section_break_links",
+  "journal_entry",
+  "payment_entry",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "default": "CBE-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Entry Series",
+   "options": "CBE-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "default": "ACC-JV-.YYYY.-",
+   "fieldname": "journal_naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "ACC-JV-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "default": "Payment",
+   "fieldname": "entry_type",
+   "fieldtype": "Select",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "label": "Entry Type",
+   "options": "Payment\nReceipt",
+   "reqd": 1
+  },
+  {
+   "default": "Bank",
+   "fieldname": "account_type",
+   "fieldtype": "Select",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "label": "Account Type",
+   "options": "Bank\nCash",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nSubmitted\nCancelled",
+   "read_only": 1
+  },
+  {
+   "default": "Journal Entry",
+   "fieldname": "settlement_mode",
+   "fieldtype": "Select",
+   "label": "Settlement Mode",
+   "options": "Journal Entry\nPayment Entry"
+  },
+  {
+   "depends_on": "eval:doc.settlement_mode == 'Payment Entry'",
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "mandatory_depends_on": "eval:doc.settlement_mode == 'Payment Entry'",
+   "options": "Mode of Payment"
+  },
+  {
+   "fieldname": "section_break_account",
+   "fieldtype": "Section Break",
+   "label": "Paid Account"
+  },
+  {
+   "fieldname": "paid_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Paid Account",
+   "options": "Account",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "paid_account.account_currency",
+   "fieldname": "paid_account_currency",
+   "fieldtype": "Link",
+   "label": "Paid Account Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "paid_account_exchange_rate",
+   "fieldtype": "Float",
+   "label": "Paid Account Exchange Rate"
+  },
+  {
+   "default": "0",
+   "fieldname": "multi_currency",
+   "fieldtype": "Check",
+   "label": "Multi Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_ref_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reference",
+   "fieldtype": "Data",
+   "label": "Cheque/Reference No"
+  },
+  {
+   "fieldname": "reference_date",
+   "fieldtype": "Date",
+   "label": "Cheque/Reference Date"
+  },
+  {
+   "fieldname": "section_break_dims",
+   "fieldtype": "Section Break",
+   "label": "Dimensions"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "link_filters": "[[\"Cost Center\",\"is_group\",\"=\",0]]",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "link_filters": "[[\"Department\",\"is_group\",\"=\",0]]",
+   "options": "Department"
+  },
+  {
+   "fieldname": "section_break_lines",
+   "fieldtype": "Section Break",
+   "label": "Account Lines"
+  },
+  {
+   "fieldname": "accounts",
+   "fieldtype": "Table",
+   "label": "Accounts",
+   "options": "Cash Bank Entry Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "user_remark",
+   "fieldtype": "Small Text",
+   "label": "User Remark"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_links",
+   "fieldtype": "Section Break",
+   "label": "Linked Documents"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Cash Bank Entry",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "idx": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-06-02 10:00:00",
+ "modified_by": "Administrator",
+ "module": "Redtra Customisation",
+ "name": "Cash Bank Entry",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

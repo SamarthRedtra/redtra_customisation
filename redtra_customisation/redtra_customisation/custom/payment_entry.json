@@ -133,6 +133,17 @@
    "width": null
   },
   {
+   "allow_on_submit": 1,
+   "dt": "Payment Entry",
+   "fieldname": "custom_cash_bank_entry",
+   "fieldtype": "Link",
+   "insert_after": "custom_is_pdc_entry",
+   "label": "Cash Bank Entry",
+   "name": "Payment Entry-custom_cash_bank_entry",
+   "options": "Cash Bank Entry",
+   "read_only": 1
+  },
+  {
    "_assign": null,
    "_comments": null,
    "_liked_by": null,

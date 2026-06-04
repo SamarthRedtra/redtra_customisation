@@ -1,0 +1,28 @@
+{
+ "app": "redtra_customisation",
+ "creation": "2026-06-02 10:00:00",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "money-coins-1",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Cash Bank Entry",
+   "link_to": "Cash Bank Entry",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-06-02 10:00:00",
+ "modified_by": "Administrator",
+ "module": "Redtra Customisation",
+ "name": "Cash Bank Entry",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Cash Bank Entry"
+}

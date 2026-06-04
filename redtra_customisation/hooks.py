@@ -58,9 +58,13 @@ doctype_js = {
 	"Shift Type": "rhr/doctype/shift_type/shift_type.js",
 	"Post Dated Cheques Tool": "redtra_customisation/doctype/post_dated_cheques_tool/post_dated_cheques_tool.js",
 	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques.js",
+	"Purchase Order": "public/js/purchase_order_nonstock.js",
+	"Purchase Invoice": "public/js/purchase_invoice_expense_account.js",
+	"Cash Bank Entry": "redtra_customisation/doctype/cash_bank_entry/cash_bank_entry.js",
 }
 doctype_list_js = {
 	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques_list.js",
+	"Cash Bank Entry": "redtra_customisation/doctype/cash_bank_entry/cash_bank_entry_list.js",
 }
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 doctype_tree_js = {"Account" : "public/js/account_tree.js",
@@ -139,6 +143,13 @@ after_migrate = "redtra_customisation.pdc.install.after_migrate"
 # permission_query_conditions = {
 # 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
 # }
+permission_query_conditions = {
+	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.get_permission_query_conditions",
+}
+
+has_permission = {
+	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.has_permission",
+}
 #
 # has_permission = {
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",
@@ -167,6 +178,8 @@ doc_events = {
 		"on_cancel": "redtra_customisation.rhr.doctype.attendance.attendance_overtime.on_cancel_attendance",
 	},
  "Purchase Order": {
+    "before_insert": "redtra_customisation.override.purchase_order_permissions.set_default_is_nonstock",
+    "validate": "redtra_customisation.override.purchase_order_permissions.validate_non_stock_user_po",
     "on_update": "redtra_customisation.override.purchase_order.on_update_po"
  },
  "Sales Order": {

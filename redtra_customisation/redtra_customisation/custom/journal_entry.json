@@ -131,6 +131,17 @@
    "translatable": 0,
    "unique": 0,
    "width": null
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Journal Entry",
+   "fieldname": "custom_cash_bank_entry",
+   "fieldtype": "Link",
+   "insert_after": "user_remark",
+   "label": "Cash Bank Entry",
+   "name": "Journal Entry-custom_cash_bank_entry",
+   "options": "Cash Bank Entry",
+   "read_only": 1
   }
  ],
  "custom_perms": [],
