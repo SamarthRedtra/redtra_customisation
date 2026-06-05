@@ -14,10 +14,17 @@ def get_permission_query_conditions(user: str | None = None) -> str | None:
 
 def has_permission(doc, ptype: str = "read", user: str | None = None) -> bool | None:
 	user = user or frappe.session.user
-	if user == "Administrator" or not is_restricted_non_stock_user(user):
+	if user == "Administrator":
 		return None
 
-	if not frappe.utils.cint(doc.get("is_nonstock")):
+	if not is_restricted_non_stock_user(user):
+		# Non-listed users are not subject to non-stock PO restrictions.
+		# Allow read/select so PR/GRN can reference linked POs without a PO read role.
+		if ptype in ("read", "select", "submit", "cancel", "amend", "report", "print", "email", "share"):
+			return True
+		return None
+
+	if not _po_is_nonstock(doc):
 		return False
 
 	return None
@@ -48,6 +55,13 @@ def is_current_user_restricted() -> int:
 
 def is_restricted_non_stock_user(user: str) -> bool:
 	return user in _get_restrict_non_stock_users()
+
+
+def _po_is_nonstock(doc) -> bool:
+	is_nonstock = doc.get("is_nonstock")
+	if is_nonstock is None and doc.get("name"):
+		is_nonstock = frappe.db.get_value("Purchase Order", doc.name, "is_nonstock")
+	return frappe.utils.cint(is_nonstock)
 
 
 @frappe.request_cache
