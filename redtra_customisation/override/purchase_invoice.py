@@ -56,21 +56,8 @@ class CustomPurchaseInvoice(PurchaseInvoice):
 						)
 
 						if negative_expense_booked_in_pr:
-							if (
-								for_validate
-								and item.expense_account
-								and item.expense_account != stock_not_billed_account
-							):
-								msg = _(
-									"Row {0}: Expense Head changed to {1} because expense is booked against this account in Purchase Receipt {2}"
-								).format(
-									item.idx,
-									frappe.bold(stock_not_billed_account),
-									frappe.bold(item.purchase_receipt),
-								)
-								frappe.msgprint(msg, title=_("Expense Head Changed"))
-
-							item.expense_account = stock_not_billed_account
+							if not item.expense_account:
+								item.expense_account = stock_not_billed_account
 					else:
 						# Keep the user-selected expense account when the custom setting allows it.
 						# Fall back to the stock account only when no account was selected.
