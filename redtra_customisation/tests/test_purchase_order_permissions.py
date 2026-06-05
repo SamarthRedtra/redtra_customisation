@@ -43,6 +43,28 @@ class TestPurchaseOrderPermissions(UnitTestCase):
 		)
 		self.assertIsNone(result)
 
+	def test_listed_user_can_create_new_po(self):
+		user = "_test_po_perm_restricted@example.com"
+		self._ensure_user(user, restricted=True)
+
+		result = has_permission(
+			{"doctype": "Purchase Order", "__islocal": 1, "is_nonstock": 0},
+			ptype="create",
+			user=user,
+		)
+		self.assertIsNone(result)
+
+	def test_non_listed_user_create_uses_role_permissions(self):
+		user = "_test_po_perm_normal@example.com"
+		self._ensure_user(user, restricted=False)
+
+		result = has_permission(
+			{"doctype": "Purchase Order", "__islocal": 1},
+			ptype="create",
+			user=user,
+		)
+		self.assertIsNone(result)
+
 	def _ensure_user(self, email: str, restricted: bool):
 		if not frappe.db.exists("User", email):
 			frappe.get_doc(

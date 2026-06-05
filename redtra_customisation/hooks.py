@@ -147,9 +147,9 @@ permission_query_conditions = {
 	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.get_permission_query_conditions",
 }
 
-has_permission = {
-	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.has_permission",
-}
+# has_permission = {
+# 	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.has_permission",
+# }
 #
 # has_permission = {
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",

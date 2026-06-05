@@ -20,14 +20,22 @@ def has_permission(doc, ptype: str = "read", user: str | None = None) -> bool | 
 	if not is_restricted_non_stock_user(user):
 		# Non-listed users are not subject to non-stock PO restrictions.
 		# Allow read/select so PR/GRN can reference linked POs without a PO read role.
-		if ptype in ("read", "select", "submit", "cancel", "amend", "report", "print", "email", "share"):
+		if ptype in ("read", "select"):
 			return True
 		return None
 
-	if not _po_is_nonstock(doc):
+	# Listed users may only work with non-stock POs.
+	if _po_is_nonstock(doc):
+		return None
+
+	# New PO creation still goes through role permissions; validate enforces is_nonstock.
+	if ptype == "create" or _doc_is_new(doc):
+		return None
+
+	if ptype in ("read", "select"):
 		return False
 
-	return None
+	return False
 
 
 def set_default_is_nonstock(doc, method=None):
@@ -55,6 +63,15 @@ def is_current_user_restricted() -> int:
 
 def is_restricted_non_stock_user(user: str) -> bool:
 	return user in _get_restrict_non_stock_users()
+
+
+def _doc_is_new(doc) -> bool:
+	if doc.get("__islocal"):
+		return True
+	is_new = getattr(doc, "is_new", None)
+	if callable(is_new):
+		return is_new()
+	return not doc.get("name")
 
 
 def _po_is_nonstock(doc) -> bool:
