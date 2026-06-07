@@ -30,7 +30,8 @@ app_include_js = [
 	"/assets/redtra_customisation/js/list_view_fix.js",
 	"/assets/redtra_customisation/js/company_navbar_display.js",
 	"/assets/redtra_customisation/js/date_session_override.js",
-	"/assets/redtra_customisation/js/date_session_navbar.js"
+	"/assets/redtra_customisation/js/date_session_navbar.js",
+	"/assets/redtra_customisation/js/general_ledger_extension.js",
 ]
 
 # include js, css files in header of web template
@@ -254,7 +255,10 @@ scheduler_events = {
 
 # Request Events
 # ----------------
-before_request = ["redtra_customisation.rpayroll.install.patch_employee_checkin_for_overtime_once"]
+before_request = [
+	"redtra_customisation.rpayroll.install.patch_employee_checkin_for_overtime_once",
+	"redtra_customisation.override.general_ledger_report.apply_general_ledger_report_patch",
+]
 # after_request = ["redtra_customisation.utils.after_request"]
 
 # Job Events
