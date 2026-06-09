@@ -32,13 +32,19 @@ class PostDatedCheques(Document):
 
 	def before_cancel(self):
 		"""Cancel submitted Payment Entries linked to this PDC."""
-		payment_entries = self._get_linked_payment_entries()
-		for payment_entry_name in payment_entries:
+		self._clear_payment_entry_link()
+		for payment_entry_name in self._get_linked_payment_entries():
+			if not frappe.db.exists("Payment Entry", payment_entry_name):
+				continue
 			pe = frappe.get_doc("Payment Entry", payment_entry_name)
-			if pe.docstatus == 1:
-				pe.cancel()
+			if pe.docstatus != 1:
+				continue
+			# PDC still points to this PE until cancel completes; skip that back-link check.
+			pe.flags.ignore_links = True
+			pe.cancel()
 
 	def on_cancel(self):
+		self._clear_payment_entry_link()
 		self.status = "Cancelled"
 		self.db_update()
 
@@ -121,6 +127,18 @@ class PostDatedCheques(Document):
 					),
 					title=_("PDC Allocation Exceeds Outstanding"),
 				)
+
+	def _clear_payment_entry_link(self):
+		if not self.payment_entry:
+			return
+		frappe.db.set_value(
+			"Post Dated Cheques",
+			self.name,
+			"payment_entry",
+			None,
+			update_modified=False,
+		)
+		self.payment_entry = None
 
 	def _get_linked_payment_entries(self):
 		linked = set()

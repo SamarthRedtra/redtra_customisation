@@ -25,6 +25,28 @@ class CustomPaymentEntry(PaymentEntry):
 		# Cheque validations removed as per user request
 		pass
 
+	def on_cancel(self):
+		super().on_cancel()
+		self.ignore_linked_doctypes = tuple(
+			dict.fromkeys(tuple(self.ignore_linked_doctypes or ()) + ("Post Dated Cheques",))
+		)
+		self._unlink_converted_pdc()
+
+	def _unlink_converted_pdc(self):
+		"""Clear PDC payment_entry when a converted cheque entry is cancelled directly."""
+		pdcs = frappe.get_all(
+			"Post Dated Cheques",
+			filters={"payment_entry": self.name, "docstatus": 1},
+			pluck="name",
+		)
+		for pdc_name in pdcs:
+			frappe.db.set_value(
+				"Post Dated Cheques",
+				pdc_name,
+				{"payment_entry": None, "status": "Pending"},
+				update_modified=False,
+			)
+
 	def is_cheque_payment(self):
 		"""Check if payment mode is cheque"""
 		if not self.mode_of_payment:
