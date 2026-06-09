@@ -61,6 +61,7 @@ doctype_js = {
 	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques.js",
 	"Purchase Order": "public/js/purchase_order_nonstock.js",
 	"Purchase Invoice": "public/js/purchase_invoice_expense_account.js",
+	"Item": "public/js/item_expense_account.js",
 	"Cash Bank Entry": "redtra_customisation/doctype/cash_bank_entry/cash_bank_entry.js",
 }
 doctype_list_js = {
