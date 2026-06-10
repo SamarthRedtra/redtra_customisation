@@ -228,10 +228,15 @@ scheduler_events = {
 
 # Overriding Methods
 # ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "redtra_customisation.event.get_events"
-# }
+override_whitelisted_methods = {
+	# ERPNext v17+ routes payment schedule RPC via services module without @whitelist.
+	"erpnext.accounts.services.payment_schedule.get_payment_terms": (
+		"erpnext.controllers.accounts_controller.get_payment_terms"
+	),
+	"erpnext.accounts.services.payment_schedule.get_payment_term_details": (
+		"erpnext.controllers.accounts_controller.get_payment_term_details"
+	),
+}
 
 # Whitelisted methods
 # -------------------
