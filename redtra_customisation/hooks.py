@@ -162,6 +162,7 @@ permission_query_conditions = {
 # Override standard doctype classes
 
 override_doctype_class = {
+	"Bank Statement Import": "redtra_customisation.override.bank_statement_import.CustomBankStatementImport",
 	"BOM Creator": "redtra_customisation.override.bom_creator.CustomBOMCreator",
 	"Purchase Invoice": "redtra_customisation.override.purchase_invoice.CustomPurchaseInvoice",
 	"Payment Entry": "redtra_customisation.pdc.payment_entry_override.CustomPaymentEntry",
