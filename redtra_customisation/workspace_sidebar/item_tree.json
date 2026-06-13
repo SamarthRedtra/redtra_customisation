@@ -1,0 +1,28 @@
+{
+ "app": "redtra_customisation",
+ "creation": "2026-06-13 10:00:00",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "list-alt",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Item Tree",
+   "link_to": "item-tree",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-06-13 10:00:00",
+ "modified_by": "Administrator",
+ "module": "Redtra Customisation",
+ "name": "Item Tree",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Item Tree"
+}
