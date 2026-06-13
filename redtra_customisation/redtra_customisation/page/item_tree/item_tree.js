@@ -80,8 +80,18 @@ frappe.pages["item-tree"].on_page_load = function (wrapper) {
 	};
 
 	page.new_item_in_group = function (item_group) {
-		frappe.route_options = { item_group };
-		frappe.new_doc("Item");
+		frappe.ui.form.make_quick_entry(
+			"Item",
+			() => page.rebuild_tree(),
+			(qe) => {
+				qe.hide_full_form_button = true;
+				if (item_group) {
+					qe.set_value("item_group", item_group);
+				}
+			},
+			{ item_group },
+			true
+		);
 	};
 
 	page.rebuild_tree = function () {

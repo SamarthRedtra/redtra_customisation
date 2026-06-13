@@ -32,6 +32,7 @@ app_include_js = [
 	"/assets/redtra_customisation/js/date_session_override.js",
 	"/assets/redtra_customisation/js/date_session_navbar.js",
 	"/assets/redtra_customisation/js/general_ledger_extension.js",
+	"/assets/redtra_customisation/js/item_quick_entry.js",
 ]
 
 # include js, css files in header of web template
