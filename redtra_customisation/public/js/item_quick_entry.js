@@ -2,9 +2,13 @@ frappe.provide("frappe.ui.form");
 
 frappe.ui.form.ItemQuickEntryForm = class ItemQuickEntryForm extends frappe.ui.form.QuickEntryForm {
 	constructor(doctype, after_insert, init_callback, doc, force) {
-		super(doctype, after_insert, init_callback, doc, force ?? true);
+		super(doctype, after_insert, init_callback, doc, force);
 		this.skip_redirect_on_error = true;
 		this.allow_any_account_on_pi = false;
+	}
+
+	is_quick_entry() {
+		return true;
 	}
 
 	render_dialog() {
