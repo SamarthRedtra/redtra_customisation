@@ -3,7 +3,27 @@
 (function () {
 	const REPORTS = ["General Ledger", "Advanced General Ledger"];
 
-	function extend_report(name) {
+	let settingsPromise = null;
+
+	function get_redtra_gl_settings() {
+		if (!settingsPromise) {
+			settingsPromise = frappe.db
+				.get_doc("Redtra Custom Setting", "Redtra Custom Setting")
+				.then((doc) => ({
+					include_against_account_entries: cint(
+						doc?.include_against_account_entries_in_gl ?? 1
+					),
+					group_by_against_voucher: cint(doc?.group_by_against_voucher_in_gl ?? 1),
+				}))
+				.catch(() => ({
+					include_against_account_entries: 1,
+					group_by_against_voucher: 1,
+				}));
+		}
+		return settingsPromise;
+	}
+
+	function extend_report(name, defaults) {
 		const settings = frappe.query_reports[name];
 		if (!settings || settings._redtra_gl_extended) {
 			return;
@@ -15,13 +35,13 @@
 				fieldname: "include_against_account_entries",
 				label: __("Include Against Account Entries"),
 				fieldtype: "Check",
-				default: 1,
+				default: defaults.include_against_account_entries,
 			},
 			{
 				fieldname: "group_by_against_voucher",
 				label: __("Group Payments With Against Invoice"),
 				fieldtype: "Check",
-				default: 1,
+				default: defaults.group_by_against_voucher,
 			}
 		);
 
@@ -29,9 +49,11 @@
 	}
 
 	function try_extend_all() {
-		for (const name of REPORTS) {
-			extend_report(name);
-		}
+		get_redtra_gl_settings().then((defaults) => {
+			for (const name of REPORTS) {
+				extend_report(name, defaults);
+			}
+		});
 	}
 
 	try_extend_all();

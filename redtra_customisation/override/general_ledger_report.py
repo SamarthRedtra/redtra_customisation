@@ -10,15 +10,34 @@ import erpnext.accounts.report.general_ledger.general_ledger as gl_report
 _ORIGINAL_GET_GL_ENTRIES = gl_report.get_gl_entries
 
 
+def _get_gl_setting(fieldname, filters, filter_key):
+	if filter_key in filters and filters.get(filter_key) is not None:
+		return cint(filters.get(filter_key))
+
+	if not frappe.get_meta("Redtra Custom Setting").has_field(fieldname):
+		return 1
+
+	value = frappe.db.get_single_value("Redtra Custom Setting", fieldname)
+	if value is None:
+		return 1
+	return cint(value)
+
+
 def get_gl_entries(filters, accounting_dimensions):
 	gl_entries = _ORIGINAL_GET_GL_ENTRIES(filters, accounting_dimensions)
 
-	if filters.get("account") and cint(filters.get("include_against_account_entries", 1)):
+	if filters.get("account") and _get_gl_setting(
+		"include_against_account_entries_in_gl",
+		filters,
+		"include_against_account_entries",
+	):
 		gl_entries = _append_voucher_contra_entries(filters, accounting_dimensions, gl_entries)
 		gl_entries = _sort_gl_entries_by_voucher(gl_entries)
 
-	if (filters.get("party_type") or filters.get("party")) and cint(
-		filters.get("group_by_against_voucher", 1)
+	if (filters.get("party_type") or filters.get("party")) and _get_gl_setting(
+		"group_by_against_voucher_in_gl",
+		filters,
+		"group_by_against_voucher",
 	):
 		gl_entries = _sort_gl_entries_for_party(gl_entries)
 
