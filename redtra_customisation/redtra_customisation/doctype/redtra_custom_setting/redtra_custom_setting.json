@@ -24,7 +24,8 @@
     "allow_any_account_on_purchase_invoice",
     "general_ledger_section",
     "include_against_account_entries_in_gl",
-    "group_by_against_voucher_in_gl"
+    "group_by_against_voucher_in_gl",
+    "allow_party_on_current_asset"
   ],
   "fields": [
     {
@@ -151,6 +152,13 @@
       "fieldtype": "Check",
       "label": "Group Payments With Against Invoice in GL",
       "description": "When party filters are used, sort payment entries with their against invoice in General Ledger reports."
+    },
+    {
+      "default": "0",
+      "fieldname": "allow_party_on_current_asset",
+      "fieldtype": "Check",
+      "label": "Allow Party on Current Asset",
+      "description": "If enabled, party type and party validations will be bypassed for Current Asset account types, permitting party mapping on them."
     }
   ],
   "index_web_pages_for_search": 1,
