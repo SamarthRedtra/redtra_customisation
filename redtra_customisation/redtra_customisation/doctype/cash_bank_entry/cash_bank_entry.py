@@ -12,9 +12,86 @@ from frappe.model.document import Document
 from frappe.utils import flt
 
 
+def get_allowed_party_accounts(company, party_type, party):
+	accounts = []
+	if not party_type or not party:
+		return accounts
+
+	# 1. Standard party account (Customer/Supplier -> Group -> Company default)
+	party_account = get_party_account(party_type, party, company, include_advance=True)
+	if isinstance(party_account, list):
+		accounts.extend(party_account)
+	elif party_account:
+		accounts.append(party_account)
+
+	# 2. Customer/Supplier Group accounts (to allow fallback when customer master overrides it)
+	if party_type in ["Customer", "Supplier"]:
+		party_group_doctype = "Customer Group" if party_type == "Customer" else "Supplier Group"
+		group = frappe.get_cached_value(party_type, party, frappe.scrub(party_group_doctype))
+		if group:
+			group_account = frappe.db.get_value(
+				"Party Account",
+				{"parenttype": party_group_doctype, "parent": group, "company": company},
+				"account",
+			)
+			if group_account:
+				accounts.append(group_account)
+
+			group_advance = frappe.db.get_value(
+				"Party Account",
+				{"parenttype": party_group_doctype, "parent": group, "company": company},
+				"advance_account",
+			)
+			if group_advance:
+				accounts.append(group_advance)
+
+	# 3. Company default accounts
+	default_field = "default_receivable_account" if party_type == "Customer" else "default_payable_account"
+	company_default = frappe.get_cached_value("Company", company, default_field)
+	if company_default:
+		accounts.append(company_default)
+
+	# 4. All active, non-group accounts of the matching type for the company
+	expected_account_type = "Receivable" if party_type == "Customer" else "Payable"
+	party_type_accounts = frappe.get_all(
+		"Account",
+		filters={
+			"company": company,
+			"account_type": expected_account_type,
+			"is_group": 0,
+			"disabled": 0,
+		},
+		pluck="name"
+	)
+	accounts.extend(party_type_accounts)
+
+	# 5. All active, non-group Current Asset accounts if allow_party_on_current_asset setting is checked
+	allow_party = False
+	try:
+		allow_party = frappe.db.get_single_value("Redtra Custom Setting", "allow_party_on_current_asset")
+	except Exception:
+		pass
+
+	if allow_party:
+		asset_accounts = frappe.get_all(
+			"Account",
+			filters={
+				"company": company,
+				"account_type": "Current Asset",
+				"is_group": 0,
+				"disabled": 0,
+			},
+			pluck="name"
+		)
+		accounts.extend(asset_accounts)
+
+	return list(set(acc for acc in accounts if acc))
+
+
 class CashBankEntry(Document):
 	def validate(self):
 		self.set_journal_naming_series()
+		self.set_invoice_accounts()
 		self.set_row_amounts()
 		self.set_multi_currency_flag()
 		self.validate_accounts()
@@ -23,6 +100,15 @@ class CashBankEntry(Document):
 		self.validate_invoice_references()
 		self.validate_settlement_mode()
 		self.set_total_amount()
+
+	def set_invoice_accounts(self):
+		for row in self.get("accounts") or []:
+			if row.reference_name and row.reference_doctype:
+				acc_field = "debit_to" if row.reference_doctype == "Sales Invoice" else "credit_to"
+				inv_acc = frappe.db.get_value(row.reference_doctype, row.reference_name, acc_field)
+				if inv_acc and row.account != inv_acc:
+					row.account = inv_acc
+
 
 	def before_insert(self):
 		if not self.status:
@@ -45,10 +131,27 @@ class CashBankEntry(Document):
 
 	def on_submit(self):
 		if self.settlement_mode == "Payment Entry":
-			pe = make_payment_entry_from_cbe(self)
-			pe.insert()
-			pe.submit()
-			self.db_set("payment_entry", pe.name, update_modified=False)
+			created_pes = []
+			for row in self.get("accounts") or []:
+				pe = make_payment_entry_from_cbe_row(self, row)
+				pe.insert()
+				pe.submit()
+				row.db_set("payment_entry", pe.name, update_modified=False)
+				created_pes.append(pe.name)
+			if created_pes:
+				self.db_set("payment_entry", created_pes[0], update_modified=False)
+
+		elif self.settlement_mode == "Post Dated Cheque":
+			created_pdcs = []
+			for row in self.get("accounts") or []:
+				pdc = make_pdc_from_cbe_row(self, row)
+				pdc.insert()
+				pdc.submit()
+				row.db_set("post_dated_cheque", pdc.name, update_modified=False)
+				created_pdcs.append(pdc.name)
+			if created_pdcs:
+				self.db_set("post_dated_cheque", created_pdcs[0], update_modified=False)
+
 		else:
 			je = make_journal_entry_from_cbe(self)
 			je.insert()
@@ -57,14 +160,52 @@ class CashBankEntry(Document):
 		self.db_set("status", "Submitted", update_modified=False)
 
 	def before_cancel(self):
+		linked_pes = set()
+		if self.payment_entry:
+			linked_pes.add(self.payment_entry)
+		for row in self.get("accounts") or []:
+			if row.get("payment_entry"):
+				linked_pes.add(row.payment_entry)
+
+		linked_pdcs = set()
+		if self.get("post_dated_cheque"):
+			linked_pdcs.add(self.post_dated_cheque)
+		for row in self.get("accounts") or []:
+			if row.get("post_dated_cheque"):
+				linked_pdcs.add(row.post_dated_cheque)
+
+		je_name = self.journal_entry
+
+		# Clear references in database to bypass LinkExistsError
 		if self.journal_entry:
-			je = frappe.get_doc("Journal Entry", self.journal_entry)
+			self.db_set("journal_entry", None, update_modified=False)
+		if self.payment_entry:
+			self.db_set("payment_entry", None, update_modified=False)
+		if self.get("post_dated_cheque"):
+			self.db_set("post_dated_cheque", None, update_modified=False)
+
+		for row in self.get("accounts") or []:
+			if row.get("payment_entry"):
+				row.db_set("payment_entry", None, update_modified=False)
+			if row.get("post_dated_cheque"):
+				row.db_set("post_dated_cheque", None, update_modified=False)
+
+		if je_name and frappe.db.exists("Journal Entry", je_name):
+			je = frappe.get_doc("Journal Entry", je_name)
 			if je.docstatus == 1:
 				je.cancel()
-		if self.payment_entry:
-			pe = frappe.get_doc("Payment Entry", self.payment_entry)
-			if pe.docstatus == 1:
-				pe.cancel()
+
+		for pe_name in linked_pes:
+			if frappe.db.exists("Payment Entry", pe_name):
+				pe = frappe.get_doc("Payment Entry", pe_name)
+				if pe.docstatus == 1:
+					pe.cancel()
+
+		for pdc_name in linked_pdcs:
+			if frappe.db.exists("Post Dated Cheques", pdc_name):
+				pdc = frappe.get_doc("Post Dated Cheques", pdc_name)
+				if pdc.docstatus == 1:
+					pdc.cancel()
 
 	def on_cancel(self):
 		self.db_set("status", "Cancelled", update_modified=False)
@@ -170,10 +311,11 @@ class CashBankEntry(Document):
 			if not row.reference_doctype:
 				frappe.throw(_("Row {0}: Reference Type is required when invoice is linked.").format(row.idx))
 
+			party_field = "customer" if row.reference_doctype == "Sales Invoice" else "supplier"
 			invoice = frappe.db.get_value(
 				row.reference_doctype,
 				row.reference_name,
-				["outstanding_amount", "docstatus", "company", "customer", "supplier"],
+				["outstanding_amount", "docstatus", "company", party_field],
 				as_dict=True,
 			)
 			if not invoice or invoice.docstatus != 1:
@@ -185,7 +327,6 @@ class CashBankEntry(Document):
 			if invoice.company != self.company:
 				frappe.throw(_("Row {0}: Invoice company does not match.").format(row.idx))
 
-			party_field = "customer" if row.reference_doctype == "Sales Invoice" else "supplier"
 			expected_party = invoice.get(party_field)
 			if row.party and row.party != expected_party:
 				frappe.throw(
@@ -205,18 +346,26 @@ class CashBankEntry(Document):
 				)
 
 	def validate_settlement_mode(self):
-		if self.settlement_mode != "Payment Entry":
+		if self.settlement_mode not in ("Payment Entry", "Post Dated Cheque"):
 			return
-		if not self.mode_of_payment:
+
+		if self.settlement_mode == "Payment Entry" and not self.mode_of_payment:
 			frappe.throw(_("Mode of Payment is required for Payment Entry settlement."))
-		if not is_pe_eligible(self):
-			frappe.throw(
-				_(
-					"Payment Entry settlement requires a single party, party receivable/payable accounts only, "
-					"and no mixed expense or income lines."
-				),
-				title=_("Payment Entry Not Eligible"),
-			)
+
+		for row in self.get("accounts") or []:
+			if not row.party_type or not row.party:
+				frappe.throw(
+					_("Row {0}: Party Type and Party are required for {1} settlement.").format(
+						row.idx, self.settlement_mode
+					)
+				)
+			allowed_accounts = get_allowed_party_accounts(self.company, row.party_type, row.party)
+			if row.account not in allowed_accounts:
+				frappe.throw(
+					_("Row {0}: Account {1} does not match the party account(s) {2}.").format(
+						row.idx, frappe.bold(row.account), ", ".join(frappe.bold(a) for a in allowed_accounts)
+					)
+				)
 
 
 def is_pe_eligible(doc) -> bool:
@@ -231,8 +380,8 @@ def is_pe_eligible(doc) -> bool:
 			return False
 		parties.add(row.party)
 		party_types.add(row.party_type)
-		party_account = get_party_account(row.party_type, row.party, doc.company, include_advance=True)
-		if row.account != party_account:
+		allowed_accounts = get_allowed_party_accounts(doc.company, row.party_type, row.party)
+		if row.account not in allowed_accounts:
 			return False
 
 	if len(parties) != 1 or len(party_types) != 1:
@@ -321,8 +470,6 @@ def make_journal_entry_from_cbe(doc):
 	je.cheque_no = doc.reference
 	je.cheque_date = doc.reference_date
 	je.user_remark = doc.user_remark or f"Cash/Bank Entry {doc.name}"
-	if hasattr(je, "custom_cash_bank_entry"):
-		je.custom_cash_bank_entry = doc.name
 	if doc.multi_currency:
 		je.multi_currency = 1
 
@@ -424,14 +571,11 @@ def make_payment_entry_from_cbe(doc):
 	first_row = doc.accounts[0]
 	party_type = first_row.party_type
 	party = first_row.party
-	party_account = get_party_account(party_type, party, doc.company, include_advance=True)
+	party_account = first_row.account
 
 	total_amount = sum(flt(row.amount) * flt(row.exchange_rate or 1) for row in doc.accounts)
 
 	pe = frappe.new_doc("Payment Entry")
-	if hasattr(pe, "custom_cash_bank_entry"):
-		pe.custom_cash_bank_entry = doc.name
-
 	pe.company = doc.company
 	pe.project = doc.project
 	pe.cost_center = doc.cost_center
@@ -484,6 +628,107 @@ def make_payment_entry_from_cbe(doc):
 		)
 
 	return pe
+
+
+def make_payment_entry_from_cbe_row(doc, row):
+	party_type = row.party_type
+	party = row.party
+	party_account = row.account
+	row_amount = flt(row.amount)
+
+	pe = frappe.new_doc("Payment Entry")
+	pe.company = doc.company
+	pe.project = row.project or doc.project
+	pe.cost_center = row.cost_center or doc.cost_center
+	if hasattr(pe, "department"):
+		pe.department = row.department or doc.department
+	pe.payment_type = "Receive" if doc.entry_type == "Receipt" else "Pay"
+	pe.party_type = party_type
+	pe.party = party
+	pe.party_name = frappe.db.get_value(party_type, party, "customer_name" if party_type == "Customer" else "supplier_name")
+	pe.mode_of_payment = doc.mode_of_payment
+	pe.posting_date = row.get("posting_date") or doc.posting_date
+	pe.reference_no = row.get("reference_no") or doc.reference
+	pe.reference_date = row.get("reference_date") or doc.reference_date
+
+	if doc.entry_type == "Receipt":
+		pe.paid_from = party_account
+		pe.paid_to = doc.paid_account
+		pe.received_amount = row_amount
+		pe.paid_amount = row_amount
+	else:
+		pe.paid_from = doc.paid_account
+		pe.paid_to = party_account
+		pe.paid_amount = row_amount
+		pe.received_amount = row_amount
+
+	acc_currency = get_party_account_currency(party_type, party, doc.company)
+	if acc_currency:
+		pe.paid_from_account_currency = acc_currency
+		pe.paid_to_account_currency = acc_currency
+
+	if row.reference_name:
+		outstanding = flt(
+			frappe.db.get_value(row.reference_doctype, row.reference_name, "outstanding_amount")
+		)
+		grand_total = flt(
+			frappe.db.get_value(row.reference_doctype, row.reference_name, "grand_total")
+		)
+		allocated = flt(row.allocated_amount) or flt(row.amount)
+		pe.append(
+			"references",
+			{
+				"reference_doctype": row.reference_doctype,
+				"reference_name": row.reference_name,
+				"total_amount": grand_total,
+				"outstanding_amount": outstanding,
+				"allocated_amount": allocated,
+			},
+		)
+
+	return pe
+
+
+def make_pdc_from_cbe_row(doc, row):
+	party_type = row.party_type
+	party = row.party
+	row_amount = flt(row.amount)
+
+	pdc = frappe.new_doc("Post Dated Cheques")
+	pdc.company = doc.company
+	pdc.project = row.project or doc.project
+	pdc.cost_center = row.cost_center or doc.cost_center
+	pdc.department = row.department or doc.department
+	pdc.posting_date = row.get("posting_date") or doc.posting_date
+	pdc.payment_type = "Receive" if doc.entry_type == "Receipt" else "Pay"
+	pdc.party_type = party_type
+	pdc.party = party
+	pdc.party_name = frappe.db.get_value(party_type, party, "customer_name" if party_type == "Customer" else "supplier_name")
+	pdc.mode_of_payment = doc.mode_of_payment
+	pdc.reference_no = row.get("reference_no") or doc.reference
+	pdc.reference_date = row.get("reference_date") or doc.reference_date
+	pdc.amount = row_amount
+	pdc.bank_account = doc.paid_account
+
+	if row.reference_name:
+		outstanding = flt(
+			frappe.db.get_value(row.reference_doctype, row.reference_name, "outstanding_amount")
+		)
+		grand_total = flt(
+			frappe.db.get_value(row.reference_doctype, row.reference_name, "grand_total")
+		)
+		allocated = flt(row.allocated_amount) or flt(row.amount)
+		pdc.append(
+			"invoice_references",
+			{
+				"reference_doctype": row.reference_doctype,
+				"reference_name": row.reference_name,
+				"total_amount": grand_total,
+				"outstanding_amount": outstanding,
+				"allocated_amount": allocated,
+			},
+		)
+	return pdc
 
 
 def get_journal_naming_series_options() -> list[str]:
@@ -630,7 +875,7 @@ def search_invoices_for_cbe(doctype, txt, searchfield, start, page_len, filters)
 	values["start"] = start
 	values["page_len"] = page_len
 
-	return frappe.db.sql(query, values, as_dict=True)
+	return frappe.db.sql(query, values, as_dict=False)
 
 
 @frappe.whitelist()
@@ -642,7 +887,8 @@ def get_cbe_invoice_details(reference_doctype, invoices):
 	if reference_doctype not in ("Sales Invoice", "Purchase Invoice") or not invoices:
 		return []
 
-	fields = ["name", "grand_total", "outstanding_amount"]
+	account_field = "debit_to" if reference_doctype == "Sales Invoice" else "credit_to"
+	fields = ["name", "grand_total", "outstanding_amount", f"{account_field} as account"]
 	rows = frappe.get_all(
 		reference_doctype,
 		filters={"name": ["in", invoices], "docstatus": 1, "outstanding_amount": [">", 0]},

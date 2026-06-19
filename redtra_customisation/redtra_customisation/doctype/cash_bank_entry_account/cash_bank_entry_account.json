@@ -22,12 +22,18 @@
   "column_break_ref",
   "reference_doctype",
   "reference_name",
+  "fetch_invoice",
   "allocated_amount",
+  "posting_date",
+  "reference_no",
+  "reference_date",
   "column_break_dims",
   "project",
   "cost_center",
   "department",
-  "remark"
+  "remark",
+  "payment_entry",
+  "post_dated_cheque"
  ],
  "fields": [
   {
@@ -121,19 +127,46 @@
   {
    "fieldname": "reference_doctype",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Reference Type",
    "options": "\nSales Invoice\nPurchase Invoice"
   },
   {
    "fieldname": "reference_name",
    "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
    "label": "Reference Name",
    "options": "reference_doctype"
   },
   {
+   "fieldname": "fetch_invoice",
+   "fieldtype": "Button",
+   "in_list_view": 1,
+   "label": "Fetch Invoice"
+  },
+  {
    "fieldname": "allocated_amount",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Allocated Amount"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date"
+  },
+  {
+   "fieldname": "reference_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Reference No"
+  },
+  {
+   "fieldname": "reference_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Reference Date"
   },
   {
    "fieldname": "column_break_dims",
@@ -161,6 +194,20 @@
    "fieldname": "remark",
    "fieldtype": "Data",
    "label": "Remark"
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "post_dated_cheque",
+   "fieldtype": "Link",
+   "label": "Post Dated Cheque",
+   "options": "Post Dated Cheques",
+   "read_only": 1
   }
  ],
  "idx": 1,

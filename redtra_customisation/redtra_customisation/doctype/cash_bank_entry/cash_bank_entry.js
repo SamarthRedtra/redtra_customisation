@@ -119,12 +119,13 @@ function default_row_dimensions(frm, cdt, cdn) {
 function fetch_exchange_rate(frm, cdt, cdn, account_field) {
 	const row = locals[cdt][cdn];
 	const account = row[account_field || "account"];
-	if (!account || !frm.doc.company || !frm.doc.posting_date) return;
+	const date_to_use = row.posting_date || frm.doc.posting_date;
+	if (!account || !frm.doc.company || !date_to_use) return;
 
 	frappe.call({
 		method: "redtra_customisation.redtra_customisation.doctype.cash_bank_entry.cash_bank_entry.get_exchange_rate_for_row",
 		args: {
-			posting_date: frm.doc.posting_date,
+			posting_date: date_to_use,
 			account,
 			company: frm.doc.company,
 			account_currency: row.account_currency,
@@ -230,7 +231,11 @@ function fetch_invoices_for_row(frm, row) {
 				},
 				callback(r) {
 					const inv = (r.message || [])[0];
-					if (!inv) return;
+					if (!inv) {
+						frappe.msgprint(__("Selected invoice is invalid, not submitted, or has no outstanding amount."));
+						d.hide();
+						return;
+					}
 					frappe.model.set_value(row.doctype, row.name, "reference_doctype", reference_doctype);
 					frappe.model.set_value(row.doctype, row.name, "reference_name", inv.name);
 					frappe.model.set_value(
@@ -239,6 +244,9 @@ function fetch_invoices_for_row(frm, row) {
 						"allocated_amount",
 						flt(inv.remaining_allocatable)
 					);
+					if (inv.account) {
+						frappe.model.set_value(row.doctype, row.name, "account", inv.account);
+					}
 					if (!flt(row.amount)) {
 						frappe.model.set_value(row.doctype, row.name, "amount", flt(inv.remaining_allocatable));
 					}
@@ -277,10 +285,15 @@ frappe.ui.form.on("Cash Bank Entry", {
 				frappe.set_route("Form", "Payment Entry", frm.doc.payment_entry);
 			});
 		}
-		if (frm.doc.docstatus === 1 && (frm.doc.journal_entry || frm.doc.payment_entry)) {
+		if (frm.doc.docstatus === 1 && frm.doc.post_dated_cheque) {
+			frm.add_custom_button(__("Open Post Dated Cheque"), () => {
+				frappe.set_route("Form", "Post Dated Cheques", frm.doc.post_dated_cheque);
+			});
+		}
+		if (frm.doc.docstatus === 1 && (frm.doc.journal_entry || frm.doc.payment_entry || frm.doc.post_dated_cheque)) {
 			frm.add_custom_button(__("General Ledger"), () => {
-				const voucher = frm.doc.journal_entry || frm.doc.payment_entry;
-				const voucher_type = frm.doc.journal_entry ? "Journal Entry" : "Payment Entry";
+				const voucher = frm.doc.journal_entry || frm.doc.payment_entry || frm.doc.post_dated_cheque;
+				const voucher_type = frm.doc.journal_entry ? "Journal Entry" : (frm.doc.payment_entry ? "Payment Entry" : "Post Dated Cheques");
 				frappe.route_options = {
 					company: frm.doc.company,
 					from_date: frm.doc.posting_date,
@@ -290,6 +303,11 @@ frappe.ui.form.on("Cash Bank Entry", {
 				frappe.set_route("query-report", "General Ledger");
 			});
 		}
+
+		// Render custom connection dashboard
+		setTimeout(() => {
+			render_custom_dashboard(frm);
+		}, 100);
 	},
 	company(frm) {
 		set_paid_account_query(frm);
@@ -319,12 +337,7 @@ frappe.ui.form.on("Cash Bank Entry", {
 		set_multi_currency_flag(frm);
 	},
 	settlement_mode(frm) {
-		if (frm.doc.settlement_mode === "Payment Entry" && frm.doc.docstatus === 0) {
-			frappe.show_alert({
-				message: __("Payment Entry mode works only for single-party invoice settlement lines."),
-				indicator: "blue",
-			});
-		}
+		// No alert needed as both PE and PDC support row-by-row multi-party settlement.
 	},
 	project(frm) {
 		(frm.doc.accounts || []).forEach(row => {
@@ -353,6 +366,12 @@ frappe.ui.form.on("Cash Bank Entry Account", {
 	account(frm, cdt, cdn) {
 		fetch_exchange_rate(frm, cdt, cdn);
 		set_multi_currency_flag(frm);
+	},
+	fetch_invoice(frm, cdt, cdn) {
+		fetch_invoices_for_row(frm, locals[cdt][cdn]);
+	},
+	posting_date(frm, cdt, cdn) {
+		fetch_exchange_rate(frm, cdt, cdn);
 	},
 	amount(frm, cdt, cdn) {
 		const row = locals[cdt][cdn];
@@ -400,3 +419,94 @@ frappe.ui.form.on("Cash Bank Entry Account", {
 		});
 	},
 });
+
+function render_custom_dashboard(frm) {
+	if (frm.doc.__islocal) {
+		if (frm.dashboard) frm.dashboard.hide();
+		return;
+	}
+
+	// Gather all linked documents
+	const payment_entries = [];
+	if (frm.doc.payment_entry) {
+		payment_entries.push(frm.doc.payment_entry);
+	}
+	(frm.doc.accounts || []).forEach(row => {
+		if (row.payment_entry && !payment_entries.includes(row.payment_entry)) {
+			payment_entries.push(row.payment_entry);
+		}
+	});
+
+	const post_dated_cheques = [];
+	if (frm.doc.post_dated_cheque) {
+		post_dated_cheques.push(frm.doc.post_dated_cheque);
+	}
+	(frm.doc.accounts || []).forEach(row => {
+		if (row.post_dated_cheque && !post_dated_cheques.includes(row.post_dated_cheque)) {
+			post_dated_cheques.push(row.post_dated_cheque);
+		}
+	});
+
+	const journal_entries = [];
+	if (frm.doc.journal_entry) {
+		journal_entries.push(frm.doc.journal_entry);
+	}
+
+	// If no linked documents, hide the dashboard links area
+	if (!payment_entries.length && !post_dated_cheques.length && !journal_entries.length) {
+		if (frm.dashboard) {
+			frm.dashboard.links_area.hide();
+		}
+		return;
+	}
+
+	if (!frm.dashboard) return;
+
+	// Prepare dashboard section
+	frm.dashboard.links_area.show();
+	frm.dashboard.transactions_area.empty();
+
+	// Construct form-documents div
+	const form_docs = $('<div class="form-documents"></div>');
+	const row_div = $('<div class="row"></div>').appendTo(form_docs);
+	const col_div = $('<div class="col-md-4"></div>').appendTo(row_div);
+
+	$(`
+		<div class="form-link-title">
+			<span>${__("Accounting")}</span>
+		</div>
+	`).appendTo(col_div);
+
+	// Helper to add a link badge
+	function add_badge_link(doctype, items) {
+		if (!items.length) return;
+
+		const count = items.length;
+		const doc_link = $(`
+			<div class="document-link" data-doctype="${doctype}">
+				<div class="document-link-badge" data-doctype="${doctype}">
+					<a class="badge-link">${__(doctype)}</a>
+					<span class="count">${count}</span>
+				</div>
+			</div>
+		`);
+
+		doc_link.find(".badge-link").on("click", () => {
+			if (count === 1) {
+				frappe.set_route("Form", doctype, items[0]);
+			} else {
+				frappe.route_options = { name: ["in", items] };
+				frappe.set_route("List", doctype, "List");
+			}
+		});
+
+		col_div.append(doc_link);
+	}
+
+	add_badge_link("Journal Entry", journal_entries);
+	add_badge_link("Payment Entry", payment_entries);
+	add_badge_link("Post Dated Cheques", post_dated_cheques);
+
+	frm.dashboard.transactions_area.append(form_docs);
+	frm.dashboard.show();
+}

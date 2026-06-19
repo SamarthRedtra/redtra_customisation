@@ -185,7 +185,7 @@ def get_existing_pdc_for_invoice(reference_doctype, reference_name, exclude_pdc=
 		"Post Dated Cheques",
 		filters={
 			"name": ["in", parents],
-			"docstatus": ["!=", 2],
+			"docstatus": 1,
 			"status": ["!=", "Cancelled"],
 		},
 		pluck="name",
@@ -229,7 +229,7 @@ def get_active_pdc_allocated_amount(reference_doctype, reference_name, exclude_p
 			"Post Dated Cheques",
 			filters={
 				"name": ["in", parent_names],
-				"docstatus": ["!=", 2],
+				"docstatus": 1,
 				"status": ["!=", "Cancelled"],
 			},
 			pluck="name",
@@ -302,7 +302,7 @@ def _active_pdc_allocation_subquery():
 			) pdc_totals ON pdc_totals.parent = ref.parent
 			WHERE ref.reference_doctype = %(reference_doctype)s
 				AND ref.reference_name = inv.name
-				AND pdc.docstatus != 2
+				AND pdc.docstatus = 1
 				AND IFNULL(pdc.status, '') != 'Cancelled'
 				AND (%(current_pdc)s = '' OR pdc.name != %(current_pdc)s)
 		), 0)
@@ -356,7 +356,7 @@ def search_purchase_invoice_for_pdc(doctype, txt, searchfield, start, page_len, 
 	values["start"] = start
 	values["page_len"] = page_len
 
-	return frappe.db.sql(query, values, as_dict=True)
+	return frappe.db.sql(query, values, as_dict=False)
 
 
 @frappe.whitelist()
@@ -379,6 +379,7 @@ def search_invoice_for_pdc(doctype, txt, searchfield, start, page_len, filters):
 
 	party_field = "customer" if reference_doctype == "Sales Invoice" else "supplier"
 	supplier_invoice_expr = "COALESCE(inv.custom_supplier_invoice_no, '')"
+	customer_invoice_expr = "COALESCE(inv.bill_no, '')"
 	search_txt = (txt or "").strip()
 	start = int(start or 0)
 	page_len = int(page_len or 20)
@@ -397,6 +398,7 @@ def search_invoice_for_pdc(doctype, txt, searchfield, start, page_len, filters):
 		SELECT
 			inv.name,
 			{supplier_invoice_expr if reference_doctype == "Purchase Invoice" else "''"} AS custom_supplier_invoice_no,
+			{customer_invoice_expr if reference_doctype == "Sales Invoice" else "''"} AS custom_customer_invoice_no,
 			inv.grand_total,
 			inv.outstanding_amount,
 			(inv.outstanding_amount - {allocation_subquery}) AS remaining_allocatable
@@ -418,7 +420,12 @@ def search_invoice_for_pdc(doctype, txt, searchfield, start, page_len, filters):
 				)
 			"""
 		else:
-			query += " AND inv.name LIKE %(txt)s"
+			query += """
+				AND (
+					inv.name LIKE %(txt)s
+					OR inv.bill_no LIKE %(txt)s
+				)
+			"""
 		values["txt"] = f"%{search_txt}%"
 
 	query += """
@@ -426,7 +433,7 @@ def search_invoice_for_pdc(doctype, txt, searchfield, start, page_len, filters):
 		LIMIT %(start)s, %(page_len)s
 	"""
 
-	return frappe.db.sql(query, values, as_dict=True)
+	return frappe.db.sql(query, values, as_dict=False)
 
 
 @frappe.whitelist()
@@ -441,6 +448,8 @@ def get_pdc_invoice_details(reference_doctype, invoices, current_pdc=None):
 	fields = ["name", "grand_total", "outstanding_amount"]
 	if reference_doctype == "Purchase Invoice":
 		fields.append("custom_supplier_invoice_no")
+	elif reference_doctype == "Sales Invoice":
+		fields.append("bill_no")
 
 	rows = frappe.get_all(
 		reference_doctype,
@@ -469,8 +478,75 @@ def get_pdc_invoice_details(reference_doctype, invoices, current_pdc=None):
 				title=_("Invoice Fully Allocated on PDC"),
 			)
 		row["remaining_allocatable"] = remaining
+		if reference_doctype == "Sales Invoice":
+			row["custom_customer_invoice_no"] = row.get("bill_no") or ""
 		result.append(row)
 
 	return result
+
+
+@frappe.whitelist()
+def get_pending_invoices(company, party_type, party, current_pdc=None):
+	if party_type not in ("Customer", "Supplier"):
+		return []
+	reference_doctype = "Sales Invoice" if party_type == "Customer" else "Purchase Invoice"
+	party_field = "customer" if party_type == "Customer" else "supplier"
+
+	# Only lock based on SUBMITTED post dated cheques
+	allocation_subquery = """
+		COALESCE((
+			SELECT SUM(
+				CASE
+					WHEN pdc_totals.total_alloc > IFNULL(pdc.amount, 0)
+						AND pdc_totals.total_alloc > 0
+						AND IFNULL(pdc.amount, 0) > 0
+					THEN ref.allocated_amount * pdc.amount / pdc_totals.total_alloc
+					ELSE ref.allocated_amount
+				END
+			)
+			FROM `tabPDC Invoice Reference` ref
+			INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
+			INNER JOIN (
+				SELECT parent, SUM(allocated_amount) AS total_alloc
+				FROM `tabPDC Invoice Reference`
+				GROUP BY parent
+			) pdc_totals ON pdc_totals.parent = ref.parent
+			WHERE ref.reference_doctype = %(reference_doctype)s
+				AND ref.reference_name = inv.name
+				AND pdc.docstatus = 1
+				AND IFNULL(pdc.status, '') != 'Cancelled'
+				AND (%(current_pdc)s = '' OR pdc.name != %(current_pdc)s)
+		), 0)
+	"""
+
+	supplier_invoice_expr = "COALESCE(inv.custom_supplier_invoice_no, '')"
+	customer_invoice_expr = "COALESCE(inv.bill_no, '')"
+
+	query = f"""
+		SELECT
+			inv.name,
+			{supplier_invoice_expr if reference_doctype == "Purchase Invoice" else "''"} AS custom_supplier_invoice_no,
+			{customer_invoice_expr if reference_doctype == "Sales Invoice" else "''"} AS custom_customer_invoice_no,
+			inv.grand_total,
+			inv.outstanding_amount,
+			(inv.outstanding_amount - {allocation_subquery}) AS remaining_allocatable
+		FROM `tab{reference_doctype}` inv
+		WHERE inv.docstatus = 1
+			AND inv.company = %(company)s
+			AND inv.{party_field} = %(party)s
+			AND inv.outstanding_amount > 0
+		ORDER BY inv.posting_date DESC, inv.name DESC
+	"""
+
+	values = {
+		"company": company,
+		"party": party,
+		"reference_doctype": reference_doctype,
+		"current_pdc": current_pdc or ""
+	}
+
+	rows = frappe.db.sql(query, values, as_dict=True)
+
+	return [r for r in rows if r.remaining_allocatable > 0.009]
 
 

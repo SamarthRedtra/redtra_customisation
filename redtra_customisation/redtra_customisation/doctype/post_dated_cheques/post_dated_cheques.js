@@ -202,72 +202,248 @@ frappe.ui.form.on("Post Dated Cheques", {
 			return;
 		}
 
-		const is_purchase_invoice = frm.doc.party_type !== "Customer";
-		const target_doctype = is_purchase_invoice ? "Purchase Invoice" : "Sales Invoice";
-		const party_field = frm.doc.party_type === "Customer" ? "customer" : "supplier";
-		const invoice_query_filters = {
-			reference_doctype: target_doctype,
-			company: frm.doc.company,
-			party: frm.doc.party,
-			current_pdc: frm.doc.name
-		};
-
-		const dialog = new frappe.ui.form.MultiSelectDialog({
-			doctype: target_doctype,
-			target: frm,
-			columns: is_purchase_invoice
-				? ["name", "custom_supplier_invoice_no", "grand_total", "outstanding_amount"]
-				: undefined,
-			setters: [
-				{
-					fieldname: "company",
-					label: __("Company"),
-					fieldtype: "Link",
-					options: "Company",
-					default: frm.doc.company,
-				},
-				{
-					fieldname: party_field,
-					label: __(frm.doc.party_type),
-					fieldtype: "Link",
-					options: frm.doc.party_type,
-					default: frm.doc.party,
-				}
-			],
-			get_query() {
-				return {
-					query: "redtra_customisation.redtra_customisation.doctype.post_dated_cheques.post_dated_cheques.search_invoice_for_pdc",
-					filters: invoice_query_filters
-				};
+		frappe.call({
+			method: "redtra_customisation.redtra_customisation.doctype.post_dated_cheques.post_dated_cheques.get_pending_invoices",
+			args: {
+				company: frm.doc.company,
+				party_type: frm.doc.party_type,
+				party: frm.doc.party,
+				current_pdc: frm.doc.name
 			},
-			action(selections) {
-				if (!selections.length) return;
+			callback(r) {
+				const invoices = r.message || [];
+				if (!invoices.length) {
+					frappe.msgprint(__("No pending invoices found for this party."));
+					return;
+				}
 
-				frappe.call({
-					method: "redtra_customisation.redtra_customisation.doctype.post_dated_cheques.post_dated_cheques.get_pdc_invoice_details",
-					args: {
-						reference_doctype: target_doctype,
-						invoices: selections,
-						current_pdc: frm.doc.name
+				const is_purchase = frm.doc.party_type !== "Customer";
+				const target_doctype = is_purchase ? "Purchase Invoice" : "Sales Invoice";
+
+				const fields = [
+					{
+						fieldtype: "Float",
+						fieldname: "total_amount",
+						label: __("Total Amount to Allocate"),
+						default: frm.doc.amount || 0
 					},
-					callback(r) {
-						if (r.message) {
-							r.message.forEach(d => {
-								const remaining = flt(d.remaining_allocatable ?? d.outstanding_amount);
-								const row = frm.add_child("invoice_references");
-								row.reference_doctype = target_doctype;
-								row.reference_name = d.name;
-								row.total_amount = d.grand_total;
-								row.outstanding_amount = d.outstanding_amount;
-								row.allocated_amount = remaining;
-							});
+					{
+						fieldtype: "Column Break"
+					},
+					{
+						fieldtype: "Float",
+						fieldname: "unallocated_amount",
+						label: __("Unallocated Amount"),
+						read_only: 1,
+						default: frm.doc.amount || 0
+					},
+					{
+						fieldtype: "Section Break"
+					},
+					{
+						fieldtype: "Data",
+						fieldname: "search_invoice",
+						label: __("Search Invoice / Reference No"),
+						placeholder: __("Search by name, supplier, or customer invoice number...")
+					},
+					{
+						fieldtype: "HTML",
+						fieldname: "invoices_table_html"
+					}
+				];
 
-							calculate_total_amount(frm);
-							frm.refresh_field("invoice_references");
+				const d = new frappe.ui.Dialog({
+					title: __("Allocate Outstanding Invoices"),
+					fields: fields,
+					size: "large",
+					primary_action_label: __("Allocate"),
+					primary_action(values) {
+						const selected_rows = [];
+						d.$wrapper.find(".invoice-row").each(function() {
+							const $row = $(this);
+							const checkbox = $row.find(".invoice-check");
+							if (checkbox.is(":checked")) {
+								const inv_name = $row.data("name");
+								const grand_total = flt($row.data("grand-total"));
+								const outstanding = flt($row.data("outstanding"));
+								const allocated = flt($row.find(".alloc-input").val());
+								if (allocated > 0) {
+									selected_rows.push({
+										reference_doctype: target_doctype,
+										reference_name: inv_name,
+										total_amount: grand_total,
+										outstanding_amount: outstanding,
+										allocated_amount: allocated
+									});
+								}
+							}
+						});
+
+						if (!selected_rows.length) {
+							frappe.msgprint(__("No invoices selected or allocated."));
+							return;
 						}
+
+						selected_rows.forEach(item => {
+							let exists = false;
+							(frm.doc.invoice_references || []).forEach(row => {
+								if (row.reference_name === item.reference_name) {
+									row.allocated_amount = item.allocated_amount;
+									exists = true;
+								}
+							});
+							if (!exists) {
+								const row = frm.add_child("invoice_references");
+								row.reference_doctype = item.reference_doctype;
+								row.reference_name = item.reference_name;
+								row.total_amount = item.total_amount;
+								row.outstanding_amount = item.outstanding_amount;
+								row.allocated_amount = item.allocated_amount;
+							}
+						});
+
+						calculate_total_amount(frm);
+						frm.refresh_field("invoice_references");
+						d.hide();
 					}
 				});
-				dialog.dialog.hide();
+
+				let html = `
+					<div style="max-height: 350px; overflow-y: auto;">
+						<table class="table table-bordered table-condensed table-hover" style="margin-bottom: 0;">
+							<thead>
+								<tr class="grid-heading-row" style="background-color: var(--bg-color); font-weight: bold;">
+									<th style="width: 40px; text-align: center;"><input type="checkbox" class="select-all-check"></th>
+									<th>${__("Invoice")}</th>
+									${is_purchase ? `<th>${__("Supplier Invoice No")}</th>` : `<th>${__("Customer Invoice No")}</th>`}
+									<th style="text-align: right;">${__("Grand Total")}</th>
+									<th style="text-align: right;">${__("Outstanding")}</th>
+									<th style="text-align: right;">${__("Remaining")}</th>
+									<th style="width: 120px; text-align: right;">${__("Allocated")}</th>
+								</tr>
+							</thead>
+							<tbody>
+				`;
+
+				invoices.forEach(inv => {
+					html += `
+						<tr class="invoice-row" data-name="${inv.name}" data-grand-total="${inv.grand_total}" data-outstanding="${inv.outstanding_amount}" data-remaining="${inv.remaining_allocatable}">
+							<td style="text-align: center; vertical-align: middle;">
+								<input type="checkbox" class="invoice-check">
+							</td>
+							<td style="vertical-align: middle;">
+								<a href="/app/${is_purchase ? 'purchase' : 'sales'}-invoice/${inv.name}" target="_blank">${inv.name}</a>
+							</td>
+							${is_purchase ? `<td style="vertical-align: middle;">${inv.custom_supplier_invoice_no || ""}</td>` : `<td style="vertical-align: middle;">${inv.custom_customer_invoice_no || ""}</td>`}
+							<td style="text-align: right; vertical-align: middle;">${format_currency(inv.grand_total, frm.doc.account_currency)}</td>
+							<td style="text-align: right; vertical-align: middle;">${format_currency(inv.outstanding_amount, frm.doc.account_currency)}</td>
+							<td style="text-align: right; vertical-align: middle;">${format_currency(inv.remaining_allocatable, frm.doc.account_currency)}</td>
+							<td style="text-align: right; vertical-align: middle;">
+								<input type="number" class="form-control input-sm alloc-input" style="text-align: right; padding: 4px;" value="0" min="0" step="any" disabled>
+							</td>
+						</tr>
+					`;
+				});
+
+				html += `
+							</tbody>
+						</table>
+					</div>
+				`;
+
+				d.fields_dict.invoices_table_html.$wrapper.html(html);
+
+				const $dialog = d.$wrapper;
+				
+				function recalculate_unallocated() {
+					const total = flt(d.get_value("total_amount"));
+					let allocated = 0;
+					$dialog.find(".invoice-row").each(function() {
+						const $row = $(this);
+						if ($row.find(".invoice-check").is(":checked")) {
+							allocated += flt($row.find(".alloc-input").val());
+						}
+					});
+					d.set_value("unallocated_amount", total - allocated);
+				}
+
+				$dialog.on("change", ".invoice-check", function() {
+					const $row = $(this).closest("tr");
+					const checked = $(this).is(":checked");
+					const remaining = flt($row.data("remaining"));
+					const $input = $row.find(".alloc-input");
+					
+					if (checked) {
+						$input.prop("disabled", false);
+						if (flt($input.val()) === 0) {
+							const unallocated = flt(d.get_value("unallocated_amount"));
+							const amount_to_set = Math.max(0, Math.min(remaining, unallocated));
+							$input.val(amount_to_set);
+						}
+					} else {
+						$input.val(0);
+						$input.prop("disabled", true);
+					}
+					recalculate_unallocated();
+				});
+
+				$dialog.on("change", ".select-all-check", function() {
+					const checked = $(this).is(":checked");
+					$dialog.find(".invoice-check").each(function() {
+						const is_checked = $(this).is(":checked");
+						if (is_checked !== checked) {
+							$(this).prop("checked", checked).trigger("change");
+						}
+					});
+				});
+
+				$dialog.on("input change", ".alloc-input", function() {
+					const $row = $(this).closest("tr");
+					const remaining = flt($row.data("remaining"));
+					let val = flt($(this).val());
+					
+					if (val < 0) {
+						val = 0;
+						$(this).val(0);
+					}
+					if (val > remaining) {
+						frappe.show_alert({
+							message: __("Amount cannot exceed remaining allocatable amount ({0})", [format_currency(remaining, frm.doc.account_currency)]),
+							indicator: "orange"
+						});
+						val = remaining;
+						$(this).val(remaining);
+					}
+					
+					const $check = $row.find(".invoice-check");
+					if (val > 0 && !$check.is(":checked")) {
+						$check.prop("checked", true);
+						$(this).prop("disabled", false);
+					}
+					
+					recalculate_unallocated();
+				});
+
+				// Text search/filter
+				d.fields_dict.search_invoice.$wrapper.on("input", "input", function() {
+					const query = $(this).val().toLowerCase().trim();
+					$dialog.find(".invoice-row").each(function() {
+						const $row = $(this);
+						const name = ($row.data("name") || "").toString().toLowerCase();
+						const ref_no = ($row.find("td").eq(2).text() || "").toString().toLowerCase();
+						if (!query || name.includes(query) || ref_no.includes(query)) {
+							$row.show();
+						} else {
+							$row.hide();
+						}
+					});
+				});
+
+				d.fields_dict.total_amount.df.onchange = () => {
+					recalculate_unallocated();
+				};
+
+				d.show();
 			}
 		});
 	}

@@ -65,7 +65,7 @@ class TestCashBankEntry(IntegrationTestCase):
 		self.assertEqual(je.voucher_type, "Bank Entry")
 		self.assertEqual(je.naming_series, cbe.journal_naming_series)
 		if hasattr(je, "custom_cash_bank_entry"):
-			self.assertEqual(je.custom_cash_bank_entry, cbe.name)
+			self.assertFalse(je.custom_cash_bank_entry)
 
 		total_debit = sum(flt(r.debit) for r in je.accounts)
 		total_credit = sum(flt(r.credit) for r in je.accounts)
@@ -214,7 +214,7 @@ class TestCashBankEntry(IntegrationTestCase):
 		pe = frappe.get_doc("Payment Entry", cbe.payment_entry)
 		self.assertEqual(pe.docstatus, 1)
 		if hasattr(pe, "custom_cash_bank_entry"):
-			self.assertEqual(pe.custom_cash_bank_entry, cbe.name)
+			self.assertFalse(pe.custom_cash_bank_entry)
 
 	def test_pe_mode_blocked_for_mixed_lines(self):
 		self._ensure_test_company()
