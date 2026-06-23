@@ -11,3 +11,5 @@ redtra_customisation.patches.v16_0.add_project_commission_defaults #dfhfh
 redtra_customisation.patches.v16_0.backfill_pdc_invoice_links
 redtra_customisation.patches.v16_0.add_cash_bank_entry_je_link
 redtra_customisation.patches.v16_0.add_gl_contra_setting_defaults #33
+redtra_customisation.patches.v16_0.add_provisional_po_settings_defaults
+redtra_customisation.patches.v16_0.add_provisional_po_field_order

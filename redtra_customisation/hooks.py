@@ -33,6 +33,8 @@ app_include_js = [
 	"/assets/redtra_customisation/js/date_session_navbar.js",
 	"/assets/redtra_customisation/js/general_ledger_extension.js",
 	"/assets/redtra_customisation/js/item_quick_entry.js",
+	"/assets/redtra_customisation/js/invoice_pdc_connections.js",
+	"/assets/redtra_customisation/js/purchase_order_update_items.js",
 ]
 
 # include js, css files in header of web template
@@ -183,9 +185,15 @@ doc_events = {
 		"on_cancel": "redtra_customisation.rhr.doctype.attendance.attendance_overtime.on_cancel_attendance",
 	},
  "Purchase Order": {
-    "before_insert": "redtra_customisation.override.purchase_order_permissions.set_default_is_nonstock",
+    "before_insert": [
+        "redtra_customisation.override.purchase_order_permissions.set_default_is_nonstock",
+        "redtra_customisation.override.provisional_purchase_order.set_default_provisional_po",
+    ],
     "validate": "redtra_customisation.override.purchase_order_permissions.validate_non_stock_user_po",
     "on_update": "redtra_customisation.override.purchase_order.on_update_po"
+ },
+ "Purchase Order Item": {
+    "before_save": "redtra_customisation.override.provisional_purchase_order.validate_purchase_order_item_rate",
  },
  "Sales Order": {
 	"validate": "redtra_customisation.commission.apply_project_wise_commission"

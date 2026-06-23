@@ -44,3 +44,24 @@ def on_update_po(doc,method):
                         item.custom_delivered = item_data.get("delivered", 0)
                         item.custom_total_outgoing = item_data.get("total_outgoing", 0)
                         item.custom_avg_daily_outgoing = item_data.get("avg_daily_outgoing", 0)              
+
+
+@frappe.whitelist()
+def po_has_submitted_receipt(purchase_order):
+	"""Return True when the PO has at least one submitted Purchase Receipt."""
+	if not purchase_order:
+		return False
+
+	return bool(
+		frappe.db.sql(
+			"""
+			SELECT 1
+			FROM `tabPurchase Receipt Item` pri
+			INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+			WHERE pri.purchase_order = %s
+				AND pr.docstatus = 1
+			LIMIT 1
+			""",
+			purchase_order,
+		)
+	)

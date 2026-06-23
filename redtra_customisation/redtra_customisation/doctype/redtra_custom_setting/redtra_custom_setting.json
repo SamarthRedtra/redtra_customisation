@@ -19,6 +19,9 @@
     "enable_project_wise_commission",
     "project_commission_slabs",
     "purchase_order_section",
+    "enable_provisional_purchase_order",
+    "auto_sync_po_qty_on_receipt",
+    "default_provisional_po_for_nonstock",
     "restrict_non_stockable_item_user",
     "purchase_invoice_section",
     "allow_any_account_on_purchase_invoice",
@@ -114,6 +117,29 @@
       "fieldname": "purchase_order_section",
       "fieldtype": "Section Break",
       "label": "Purchase Order"
+    },
+    {
+      "default": "0",
+      "fieldname": "enable_provisional_purchase_order",
+      "fieldtype": "Check",
+      "label": "Enable Provisional Purchase Order",
+      "description": "Allow open PO workflow: estimated qty on PO, actual qty on Purchase Receipt, optional auto-sync of PO qty to received qty."
+    },
+    {
+      "default": "1",
+      "depends_on": "eval:doc.enable_provisional_purchase_order",
+      "fieldname": "auto_sync_po_qty_on_receipt",
+      "fieldtype": "Check",
+      "label": "Auto Sync PO Qty on Receipt",
+      "description": "When a receipt exceeds PO qty, increase PO qty to match received qty. PO estimate qty is kept so multiple Purchase Receipts can be created."
+    },
+    {
+      "default": "0",
+      "depends_on": "eval:doc.enable_provisional_purchase_order",
+      "fieldname": "default_provisional_po_for_nonstock",
+      "fieldtype": "Check",
+      "label": "Default Provisional PO for Non Stock",
+      "description": "New non-stock Purchase Orders are marked as Provisional / Open PO by default."
     },
     {
       "fieldname": "restrict_non_stockable_item_user",

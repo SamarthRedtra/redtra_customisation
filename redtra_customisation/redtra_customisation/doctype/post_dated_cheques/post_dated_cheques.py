@@ -550,3 +550,62 @@ def get_pending_invoices(company, party_type, party, current_pdc=None):
 	return [r for r in rows if r.remaining_allocatable > 0.009]
 
 
+@frappe.whitelist()
+def get_invoice_pdc_connections(reference_doctype, reference_name):
+	"""Return active Post Dated Cheques linked to a Sales/Purchase Invoice."""
+	if reference_doctype not in ("Sales Invoice", "Purchase Invoice"):
+		frappe.throw(_("Invalid invoice doctype"))
+
+	if not reference_name or not frappe.db.exists(reference_doctype, reference_name):
+		return []
+
+	rows = frappe.db.sql(
+		"""
+		SELECT
+			pdc.name,
+			pdc.status,
+			pdc.reference_no,
+			pdc.reference_date,
+			pdc.amount,
+			pdc.payment_entry,
+			ref.allocated_amount,
+			pe.pdc_cheque_status AS payment_entry_status
+		FROM `tabPDC Invoice Reference` ref
+		INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
+		LEFT JOIN `tabPayment Entry` pe
+			ON pe.name = pdc.payment_entry AND pe.docstatus = 1
+		WHERE ref.reference_doctype = %(reference_doctype)s
+			AND ref.reference_name = %(reference_name)s
+			AND ref.parenttype = 'Post Dated Cheques'
+			AND ref.parentfield = 'invoice_references'
+			AND pdc.docstatus = 1
+			AND IFNULL(pdc.status, '') != 'Cancelled'
+		ORDER BY pdc.reference_date DESC, pdc.name DESC
+		""",
+		{
+			"reference_doctype": reference_doctype,
+			"reference_name": reference_name,
+		},
+		as_dict=True,
+	)
+
+	for row in rows:
+		row["display_status"] = _get_pdc_display_status(row.status, row.payment_entry_status)
+
+	return rows
+
+
+def _get_pdc_display_status(pdc_status, payment_entry_status=None):
+	status = (pdc_status or "").strip()
+	pe_status = (payment_entry_status or "").strip()
+
+	if status == "Converted":
+		if pe_status:
+			return _("Converted / {0}").format(pe_status)
+		return _("Converted")
+
+	if status:
+		return _(status)
+
+	return _("Pending")
+
