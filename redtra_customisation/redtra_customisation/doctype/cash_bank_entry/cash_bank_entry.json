@@ -31,6 +31,8 @@
   "department",
   "section_break_lines",
   "accounts",
+  "section_break_invoice_refs",
+  "invoice_references",
   "section_break_totals",
   "amount",
   "user_remark",
@@ -209,6 +211,19 @@
    "label": "Accounts",
    "options": "Cash Bank Entry Account",
    "reqd": 1
+  },
+  {
+   "depends_on": "eval:['Payment Entry', 'Post Dated Cheque'].includes(doc.settlement_mode)",
+   "fieldname": "section_break_invoice_refs",
+   "fieldtype": "Section Break",
+   "label": "Invoice References"
+  },
+  {
+   "depends_on": "eval:['Payment Entry', 'Post Dated Cheque'].includes(doc.settlement_mode)",
+   "fieldname": "invoice_references",
+   "fieldtype": "Table",
+   "label": "Invoice References",
+   "options": "Cash Bank Entry Invoice Reference"
   },
   {
    "fieldname": "section_break_totals",

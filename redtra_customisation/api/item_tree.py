@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Redtra Customisation and contributors
 
 import frappe
+from frappe.utils import flt
 
 ROOT_LABEL = "All Item Groups"
 
@@ -15,10 +16,14 @@ def get_children(
 	brand=None,
 	root_item_group=None,
 	search=None,
+	warehouse=None,
+	stock_qty_filter=None,
 ):
 	include_disabled = frappe.sbool(include_disabled)
 	tree_root = root_item_group or ROOT_LABEL
 	search = (search or "").strip()
+	warehouse = (warehouse or "").strip() or None
+	stock_qty_filter = (stock_qty_filter or "").strip() or None
 
 	if is_root or not parent:
 		parent = tree_root
@@ -33,6 +38,8 @@ def get_children(
 			brand=brand,
 			search=search,
 			root_item_group=root_item_group,
+			warehouse=warehouse,
+			stock_qty_filter=stock_qty_filter,
 		)
 		relevant_groups = _build_relevant_groups(matching_items, root_item_group)
 		matching_items_by_group = {}
@@ -68,14 +75,20 @@ def get_children(
 			brand=brand,
 			search=search,
 			matching_items_by_group=matching_items_by_group,
+			warehouse=warehouse,
+			stock_qty_filter=stock_qty_filter,
 		)
+		qty_map = _get_bin_qty_map([item.item_code for item in items], warehouse) if warehouse else {}
 		for item in items:
+			qty = qty_map.get(item.item_code) if warehouse else None
 			nodes.append(
 				{
 					"value": item.name,
 					"title": _get_item_title(item),
 					"expandable": 0,
 					"is_item": 1,
+					"stock_qty": qty if warehouse else None,
+					"stock_uom": item.get("stock_uom"),
 				}
 			)
 
@@ -121,9 +134,10 @@ def get_all_nodes(doctype=None, label=None, parent=None, tree_method=None, **fil
 
 
 def _get_item_title(item):
+	base = item.item_code or item.name
 	if item.item_name and item.item_code != item.item_name:
-		return f"{item.item_code} - {item.item_name}"
-	return item.item_code or item.name
+		base = f"{item.item_code} - {item.item_name}"
+	return base
 
 
 def _get_item_filters(include_disabled, is_stock_item, brand):
@@ -139,25 +153,73 @@ def _get_item_filters(include_disabled, is_stock_item, brand):
 	return filters
 
 
-def _get_matching_items(include_disabled, is_stock_item, brand, search, root_item_group=None):
+def _get_bin_qty_map(item_codes, warehouse):
+	item_codes = [code for code in dict.fromkeys(item_codes or []) if code]
+	if not item_codes or not warehouse:
+		return {}
+
+	rows = frappe.get_all(
+		"Bin",
+		filters={"warehouse": warehouse, "item_code": ["in", item_codes]},
+		fields=["item_code", "actual_qty"],
+	)
+	return {row.item_code: flt(row.actual_qty) for row in rows}
+
+
+def _passes_stock_qty_filter(item, qty_map, warehouse, stock_qty_filter):
+	if not warehouse or not stock_qty_filter or stock_qty_filter == "All":
+		return True
+
+	qty = flt(qty_map.get(item.item_code, 0))
+	is_stock = frappe.utils.cint(item.get("is_stock_item"))
+
+	if stock_qty_filter == "Non-Zero":
+		return (not is_stock) or qty > 0
+	if stock_qty_filter == "Zero":
+		return is_stock and qty <= 0
+	return True
+
+
+def _get_matching_items(
+	include_disabled,
+	is_stock_item,
+	brand,
+	search,
+	root_item_group=None,
+	warehouse=None,
+	stock_qty_filter=None,
+):
 	filters = _get_item_filters(include_disabled, is_stock_item, brand)
-	or_filters = [
-		["item_code", "like", f"%{search}%"],
-		["item_name", "like", f"%{search}%"],
-	]
+	search = search.strip()
+	search_lower = search.lower()
 
 	items = frappe.get_all(
 		"Item",
 		filters=filters,
-		or_filters=or_filters,
-		fields=["name", "item_code", "item_name", "item_group"],
+		fields=["name", "item_code", "item_name", "item_group", "stock_uom", "is_stock_item"],
 		order_by="item_code",
 	)
+
+	items = [
+		item
+		for item in items
+		if search_lower in (item.item_code or "").lower()
+		or search_lower in (item.item_name or "").lower()
+		or search_lower in (item.name or "").lower()
+	]
 
 	if root_item_group:
 		allowed_groups = _get_descendant_groups(root_item_group)
 		allowed_groups.add(root_item_group)
 		items = [item for item in items if item.item_group in allowed_groups]
+
+	if warehouse and stock_qty_filter and stock_qty_filter != "All":
+		qty_map = _get_bin_qty_map([item.item_code for item in items], warehouse)
+		items = [
+			item
+			for item in items
+			if _passes_stock_qty_filter(item, qty_map, warehouse, stock_qty_filter)
+		]
 
 	return items
 
@@ -169,6 +231,8 @@ def _get_items_for_group(
 	brand,
 	search,
 	matching_items_by_group=None,
+	warehouse=None,
+	stock_qty_filter=None,
 ):
 	if search and matching_items_by_group is not None:
 		return matching_items_by_group.get(group, [])
@@ -176,12 +240,22 @@ def _get_items_for_group(
 	filters = _get_item_filters(include_disabled, is_stock_item, brand)
 	filters["item_group"] = group
 
-	return frappe.get_all(
+	items = frappe.get_all(
 		"Item",
 		filters=filters,
-		fields=["name", "item_code", "item_name", "item_group"],
+		fields=["name", "item_code", "item_name", "item_group", "stock_uom", "is_stock_item"],
 		order_by="item_code",
 	)
+
+	if warehouse and stock_qty_filter and stock_qty_filter != "All":
+		qty_map = _get_bin_qty_map([item.item_code for item in items], warehouse)
+		items = [
+			item
+			for item in items
+			if _passes_stock_qty_filter(item, qty_map, warehouse, stock_qty_filter)
+		]
+
+	return items
 
 
 def _build_relevant_groups(matching_items, root_item_group=None):

@@ -7,9 +7,51 @@ frappe.pages["item-tree"].on_page_load = function (wrapper) {
 
 	page.main.addClass("frappe-card");
 
+	if (!$("#item-tree-qty-style").length) {
+		$("head").append(`
+			<style id="item-tree-qty-style">
+				.item-tree-container .tree-link .tree-label {
+					display: inline-flex;
+					align-items: center;
+					gap: 8px;
+					width: calc(100% - 24px);
+				}
+				.item-tree-container .item-tree-qty {
+					margin-left: auto;
+					font-size: 11px;
+					color: var(--text-muted);
+					white-space: nowrap;
+				}
+			</style>
+		`);
+	}
+
 	page.tree_container = $('<div class="item-tree-container">').appendTo(page.main);
 
 	page.search_timeout = null;
+
+	const saved_warehouse = localStorage.getItem("item_tree_warehouse");
+
+	page.warehouse_field = page.add_field({
+		fieldname: "warehouse",
+		label: __("Warehouse"),
+		fieldtype: "Link",
+		options: "Warehouse",
+		default: saved_warehouse || undefined,
+		get_query() {
+			const company = frappe.defaults.get_user_default("Company");
+			return company ? { filters: { company, is_group: 0 } } : {};
+		},
+		change() {
+			const value = page.warehouse_field.get_value();
+			if (value) {
+				localStorage.setItem("item_tree_warehouse", value);
+			} else {
+				localStorage.removeItem("item_tree_warehouse");
+			}
+			page.rebuild_tree();
+		},
+	});
 
 	page.root_item_group_field = page.add_field({
 		fieldname: "root_item_group",
@@ -27,6 +69,14 @@ frappe.pages["item-tree"].on_page_load = function (wrapper) {
 			clearTimeout(page.search_timeout);
 			page.search_timeout = setTimeout(() => page.rebuild_tree(), 300);
 		},
+	});
+
+	page.stock_qty_filter_field = page.add_field({
+		fieldname: "stock_qty_filter",
+		label: __("Stock Qty"),
+		fieldtype: "Select",
+		options: "\nAll\nNon-Zero\nZero",
+		change: () => page.rebuild_tree(),
 	});
 
 	page.brand_field = page.add_field({
@@ -55,6 +105,14 @@ frappe.pages["item-tree"].on_page_load = function (wrapper) {
 	page.add_inner_button(__("Expand All"), () => page.expand_all());
 	page.add_inner_button(__("Refresh"), () => page.rebuild_tree());
 
+	if (!saved_warehouse) {
+		frappe.db.get_single_value("Stock Settings", "default_warehouse").then((default_warehouse) => {
+			if (default_warehouse && !page.warehouse_field.get_value()) {
+				page.warehouse_field.set_value(default_warehouse);
+			}
+		});
+	}
+
 	page.get_tree_args = function () {
 		return {
 			doctype: "Item Group",
@@ -63,6 +121,8 @@ frappe.pages["item-tree"].on_page_load = function (wrapper) {
 			brand: page.brand_field.get_value(),
 			root_item_group: page.root_item_group_field.get_value(),
 			search: page.search_field.get_value(),
+			warehouse: page.warehouse_field.get_value(),
+			stock_qty_filter: page.stock_qty_filter_field.get_value() || "All",
 		};
 	};
 
@@ -135,8 +195,23 @@ frappe.pages["item-tree"].on_page_load = function (wrapper) {
 				}
 			},
 			on_render: function (node) {
-				if (node.data.is_item) {
-					node.$tree_link.find(".tree-label").addClass("text-muted");
+				if (!node.data.is_item) {
+					return;
+				}
+				const $label = node.$tree_link.find(".tree-label");
+				$label.addClass("text-muted");
+
+				if (node.data.stock_qty === undefined || node.data.stock_qty === null) {
+					return;
+				}
+
+				const qty = flt(node.data.stock_qty);
+				const uom = node.data.stock_uom || "";
+				const qty_text = frappe.format(qty, { fieldtype: "Float", precision: 2 });
+				const display = uom ? `${qty_text} ${uom}` : qty_text;
+
+				if (!$label.find(".item-tree-qty").length) {
+					$label.append(`<span class="item-tree-qty">${display}</span>`);
 				}
 			},
 		});

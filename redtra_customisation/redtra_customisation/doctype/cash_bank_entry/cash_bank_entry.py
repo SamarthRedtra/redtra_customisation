@@ -103,11 +103,18 @@ class CashBankEntry(Document):
 
 	def set_invoice_accounts(self):
 		for row in self.get("accounts") or []:
-			if row.reference_name and row.reference_doctype:
-				acc_field = "debit_to" if row.reference_doctype == "Sales Invoice" else "credit_to"
-				inv_acc = frappe.db.get_value(row.reference_doctype, row.reference_name, acc_field)
+			refs = get_invoice_refs_for_cbe_row(self, row)
+			target_refs = refs or ([row] if row.reference_name and row.reference_doctype else [])
+			for ref in target_refs:
+				ref_doctype = ref.reference_doctype if hasattr(ref, "reference_doctype") else ref.get("reference_doctype")
+				ref_name = ref.reference_name if hasattr(ref, "reference_name") else ref.get("reference_name")
+				if not ref_name or not ref_doctype:
+					continue
+				acc_field = "debit_to" if ref_doctype == "Sales Invoice" else "credit_to"
+				inv_acc = frappe.db.get_value(ref_doctype, ref_name, acc_field)
 				if inv_acc and row.account != inv_acc:
 					row.account = inv_acc
+					break
 
 
 	def before_insert(self):
@@ -212,7 +219,15 @@ class CashBankEntry(Document):
 
 	def set_row_amounts(self):
 		for row in self.get("accounts") or []:
-			if not flt(row.allocated_amount) and row.reference_name:
+			refs = get_invoice_refs_for_cbe_row(self, row)
+			if refs:
+				total_allocated = sum(flt(ref.allocated_amount) for ref in refs)
+				row.amount = total_allocated
+				row.allocated_amount = total_allocated
+				first_ref = refs[0]
+				row.reference_doctype = first_ref.reference_doctype
+				row.reference_name = first_ref.reference_name
+			elif not flt(row.allocated_amount) and row.reference_name:
 				row.allocated_amount = flt(row.amount)
 			row.amount_in_company_currency = flt(row.amount) * flt(row.exchange_rate or 1)
 			if not flt(row.tax_amount):
@@ -305,45 +320,104 @@ class CashBankEntry(Document):
 				)
 
 	def validate_invoice_references(self):
+		if self.settlement_mode not in ("Payment Entry", "Post Dated Cheque"):
+			return
+
+		seen_by_row = {}
+		for inv_ref in self.get("invoice_references") or []:
+			if not inv_ref.reference_name or not inv_ref.reference_doctype:
+				continue
+			if not inv_ref.account_row:
+				frappe.throw(_("Invoice Reference row {0}: Account line link is missing.").format(inv_ref.idx))
+
+			account_row = self._get_account_row_by_name(inv_ref.account_row)
+			if not account_row:
+				frappe.throw(
+					_("Invoice Reference row {0}: Linked account line no longer exists.").format(inv_ref.idx)
+				)
+
+			row_key = inv_ref.account_row
+			seen_by_row.setdefault(row_key, set())
+			if inv_ref.reference_name in seen_by_row[row_key]:
+				frappe.throw(
+					_("Line {0}: Invoice {1} is linked more than once.").format(
+						account_row.idx, inv_ref.reference_name
+					)
+				)
+			seen_by_row[row_key].add(inv_ref.reference_name)
+
+			self._validate_single_invoice_reference(
+				account_row,
+				inv_ref.reference_doctype,
+				inv_ref.reference_name,
+				flt(inv_ref.allocated_amount),
+			)
+
 		for row in self.get("accounts") or []:
+			child_refs = get_invoice_refs_for_cbe_row(self, row)
+			if child_refs:
+				total_allocated = sum(flt(ref.allocated_amount) for ref in child_refs)
+				if abs(total_allocated - flt(row.amount)) > 0.01:
+					frappe.throw(
+						_("Row {0}: Line amount {1} must equal total invoice allocations {2}.").format(
+							row.idx, flt(row.amount), total_allocated
+						)
+					)
+				continue
+
 			if not row.reference_name:
 				continue
 			if not row.reference_doctype:
 				frappe.throw(_("Row {0}: Reference Type is required when invoice is linked.").format(row.idx))
 
-			party_field = "customer" if row.reference_doctype == "Sales Invoice" else "supplier"
-			invoice = frappe.db.get_value(
-				row.reference_doctype,
-				row.reference_name,
-				["outstanding_amount", "docstatus", "company", party_field],
-				as_dict=True,
-			)
-			if not invoice or invoice.docstatus != 1:
-				frappe.throw(
-					_("Row {0}: {1} {2} is not a submitted invoice.").format(
-						row.idx, row.reference_doctype, row.reference_name
-					)
-				)
-			if invoice.company != self.company:
-				frappe.throw(_("Row {0}: Invoice company does not match.").format(row.idx))
-
-			expected_party = invoice.get(party_field)
-			if row.party and row.party != expected_party:
-				frappe.throw(
-					_("Row {0}: Party {1} does not match invoice party {2}.").format(
-						row.idx, row.party, expected_party
-					)
-				)
-
 			allocated = flt(row.allocated_amount) or flt(row.amount)
-			outstanding = flt(invoice.outstanding_amount)
-			if allocated > outstanding + 0.01:
-				frappe.throw(
-					_("Row {0}: Allocated amount {1} exceeds invoice outstanding {2}.").format(
-						row.idx, allocated, outstanding
-					),
-					title=_("Allocation Exceeds Outstanding"),
+			self._validate_single_invoice_reference(
+				row, row.reference_doctype, row.reference_name, allocated
+			)
+
+	def _get_account_row_by_name(self, account_row_name):
+		for row in self.get("accounts") or []:
+			if row.name == account_row_name:
+				return row
+		return None
+
+	def _validate_single_invoice_reference(self, account_row, reference_doctype, reference_name, allocated):
+		party_field = "customer" if reference_doctype == "Sales Invoice" else "supplier"
+		invoice = frappe.db.get_value(
+			reference_doctype,
+			reference_name,
+			["outstanding_amount", "docstatus", "company", party_field],
+			as_dict=True,
+		)
+		if not invoice or invoice.docstatus != 1:
+			frappe.throw(
+				_("Row {0}: {1} {2} is not a submitted invoice.").format(
+					account_row.idx, reference_doctype, reference_name
 				)
+			)
+		if invoice.company != self.company:
+			frappe.throw(_("Row {0}: Invoice company does not match.").format(account_row.idx))
+
+		expected_party = invoice.get(party_field)
+		if account_row.party and account_row.party != expected_party:
+			frappe.throw(
+				_("Row {0}: Party {1} does not match invoice party {2}.").format(
+					account_row.idx, account_row.party, expected_party
+				)
+			)
+
+		remaining = get_remaining_allocatable(
+			reference_doctype,
+			reference_name,
+			current_cbe=self.name if not self.is_new() else None,
+		)
+		if allocated > remaining + 0.01:
+			frappe.throw(
+				_("Row {0}: Allocated amount {1} exceeds remaining allocatable {2} for {3}.").format(
+					account_row.idx, allocated, remaining, reference_name
+				),
+				title=_("Allocation Exceeds Outstanding"),
+			)
 
 	def validate_settlement_mode(self):
 		if self.settlement_mode not in ("Payment Entry", "Post Dated Cheque"):
@@ -667,26 +741,44 @@ def make_payment_entry_from_cbe_row(doc, row):
 		pe.paid_from_account_currency = acc_currency
 		pe.paid_to_account_currency = acc_currency
 
-	if row.reference_name:
-		outstanding = flt(
-			frappe.db.get_value(row.reference_doctype, row.reference_name, "outstanding_amount")
-		)
-		grand_total = flt(
-			frappe.db.get_value(row.reference_doctype, row.reference_name, "grand_total")
-		)
-		allocated = flt(row.allocated_amount) or flt(row.amount)
-		pe.append(
-			"references",
-			{
-				"reference_doctype": row.reference_doctype,
-				"reference_name": row.reference_name,
-				"total_amount": grand_total,
-				"outstanding_amount": outstanding,
-				"allocated_amount": allocated,
-			},
+	refs = get_invoice_refs_for_cbe_row(doc, row)
+	if refs:
+		for inv_ref in refs:
+			_append_pe_invoice_reference(pe, inv_ref)
+	elif row.reference_name:
+		_append_pe_invoice_reference(
+			pe,
+			frappe._dict(
+				{
+					"reference_doctype": row.reference_doctype,
+					"reference_name": row.reference_name,
+					"total_amount": None,
+					"outstanding_amount": None,
+					"allocated_amount": flt(row.allocated_amount) or flt(row.amount),
+				}
+			),
 		)
 
 	return pe
+
+
+def _append_pe_invoice_reference(pe, inv_ref):
+	outstanding = flt(
+		frappe.db.get_value(inv_ref.reference_doctype, inv_ref.reference_name, "outstanding_amount")
+	)
+	grand_total = flt(
+		frappe.db.get_value(inv_ref.reference_doctype, inv_ref.reference_name, "grand_total")
+	)
+	pe.append(
+		"references",
+		{
+			"reference_doctype": inv_ref.reference_doctype,
+			"reference_name": inv_ref.reference_name,
+			"total_amount": flt(inv_ref.total_amount) or grand_total,
+			"outstanding_amount": flt(inv_ref.outstanding_amount) or outstanding,
+			"allocated_amount": flt(inv_ref.allocated_amount),
+		},
+	)
 
 
 def make_pdc_from_cbe_row(doc, row):
@@ -710,25 +802,157 @@ def make_pdc_from_cbe_row(doc, row):
 	pdc.amount = row_amount
 	pdc.bank_account = doc.paid_account
 
-	if row.reference_name:
-		outstanding = flt(
-			frappe.db.get_value(row.reference_doctype, row.reference_name, "outstanding_amount")
-		)
-		grand_total = flt(
-			frappe.db.get_value(row.reference_doctype, row.reference_name, "grand_total")
-		)
-		allocated = flt(row.allocated_amount) or flt(row.amount)
-		pdc.append(
-			"invoice_references",
-			{
-				"reference_doctype": row.reference_doctype,
-				"reference_name": row.reference_name,
-				"total_amount": grand_total,
-				"outstanding_amount": outstanding,
-				"allocated_amount": allocated,
-			},
+	refs = get_invoice_refs_for_cbe_row(doc, row)
+	if refs:
+		for inv_ref in refs:
+			_append_pdc_invoice_reference(pdc, inv_ref)
+	elif row.reference_name:
+		_append_pdc_invoice_reference(
+			pdc,
+			frappe._dict(
+				{
+					"reference_doctype": row.reference_doctype,
+					"reference_name": row.reference_name,
+					"total_amount": None,
+					"outstanding_amount": None,
+					"allocated_amount": flt(row.allocated_amount) or flt(row.amount),
+				}
+			),
 		)
 	return pdc
+
+
+def _append_pdc_invoice_reference(pdc, inv_ref):
+	outstanding = flt(
+		frappe.db.get_value(inv_ref.reference_doctype, inv_ref.reference_name, "outstanding_amount")
+	)
+	grand_total = flt(
+		frappe.db.get_value(inv_ref.reference_doctype, inv_ref.reference_name, "grand_total")
+	)
+	pdc.append(
+		"invoice_references",
+		{
+			"reference_doctype": inv_ref.reference_doctype,
+			"reference_name": inv_ref.reference_name,
+			"total_amount": flt(inv_ref.total_amount) or grand_total,
+			"outstanding_amount": flt(inv_ref.outstanding_amount) or outstanding,
+			"allocated_amount": flt(inv_ref.allocated_amount),
+		},
+	)
+
+
+def get_invoice_refs_for_cbe_row(doc, row):
+	child_refs = [
+		ref
+		for ref in doc.get("invoice_references") or []
+		if ref.account_row == row.name and ref.reference_name
+	]
+	if child_refs:
+		return child_refs
+	return []
+
+
+def _scaled_pdc_allocation_subquery(reference_doctype: str, current_pdc: str = "") -> str:
+	return f"""
+		COALESCE((
+			SELECT SUM(
+				CASE
+					WHEN pdc_totals.total_alloc > IFNULL(pdc.amount, 0)
+						AND pdc_totals.total_alloc > 0
+						AND IFNULL(pdc.amount, 0) > 0
+					THEN ref.allocated_amount * pdc.amount / pdc_totals.total_alloc
+					ELSE ref.allocated_amount
+				END
+			)
+			FROM `tabPDC Invoice Reference` ref
+			INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
+			INNER JOIN (
+				SELECT parent, SUM(allocated_amount) AS total_alloc
+				FROM `tabPDC Invoice Reference`
+				GROUP BY parent
+			) pdc_totals ON pdc_totals.parent = ref.parent
+			WHERE ref.reference_doctype = %(reference_doctype)s
+				AND ref.reference_name = inv.name
+				AND pdc.docstatus = 1
+				AND IFNULL(pdc.status, '') != 'Cancelled'
+				AND (%(current_pdc)s = '' OR pdc.name != %(current_pdc)s)
+		), 0)
+	"""
+
+
+def _cbe_allocation_subquery(reference_doctype: str, current_cbe: str = "") -> str:
+	return f"""
+		COALESCE((
+			SELECT SUM(ref.allocated_amount)
+			FROM `tabCash Bank Entry Invoice Reference` ref
+			INNER JOIN `tabCash Bank Entry` cbe ON cbe.name = ref.parent
+			WHERE ref.reference_doctype = %(reference_doctype)s
+				AND ref.reference_name = inv.name
+				AND cbe.docstatus < 2
+				AND IFNULL(cbe.status, '') != 'Cancelled'
+				AND (%(current_cbe)s = '' OR cbe.name != %(current_cbe)s)
+		), 0)
+	"""
+
+
+def get_remaining_allocatable(reference_doctype, invoice_name, current_cbe=None):
+	if reference_doctype not in ("Sales Invoice", "Purchase Invoice") or not invoice_name:
+		return 0
+
+	outstanding = flt(frappe.db.get_value(reference_doctype, invoice_name, "outstanding_amount"))
+	if outstanding <= 0:
+		return 0
+
+	pdc_reserved = flt(
+		frappe.db.sql(
+			"""
+			SELECT COALESCE(SUM(
+				CASE
+					WHEN pdc_totals.total_alloc > IFNULL(pdc.amount, 0)
+						AND pdc_totals.total_alloc > 0
+						AND IFNULL(pdc.amount, 0) > 0
+					THEN ref.allocated_amount * pdc.amount / pdc_totals.total_alloc
+					ELSE ref.allocated_amount
+				END
+			), 0)
+			FROM `tabPDC Invoice Reference` ref
+			INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
+			INNER JOIN (
+				SELECT parent, SUM(allocated_amount) AS total_alloc
+				FROM `tabPDC Invoice Reference`
+				GROUP BY parent
+			) pdc_totals ON pdc_totals.parent = ref.parent
+			WHERE ref.reference_doctype = %s
+				AND ref.reference_name = %s
+				AND pdc.docstatus = 1
+				AND IFNULL(pdc.status, '') != 'Cancelled'
+			""",
+			(reference_doctype, invoice_name),
+		)[0][0]
+	)
+
+	cbe_filters = {
+		"reference_doctype": reference_doctype,
+		"invoice_name": invoice_name,
+		"current_cbe": current_cbe or "",
+	}
+	cbe_reserved = flt(
+		frappe.db.sql(
+			"""
+			SELECT COALESCE(SUM(ref.allocated_amount), 0)
+			FROM `tabCash Bank Entry Invoice Reference` ref
+			INNER JOIN `tabCash Bank Entry` cbe ON cbe.name = ref.parent
+			WHERE ref.reference_doctype = %(reference_doctype)s
+				AND ref.reference_name = %(invoice_name)s
+				AND cbe.docstatus < 2
+				AND IFNULL(cbe.status, '') != 'Cancelled'
+				AND (%(current_cbe)s = '' OR cbe.name != %(current_cbe)s)
+			""",
+			cbe_filters,
+		)[0][0]
+	)
+
+	return max(outstanding - pdc_reserved - cbe_reserved, 0)
 
 
 def get_journal_naming_series_options() -> list[str]:
@@ -821,6 +1045,47 @@ def get_tax_from_template(template, amount, entry_type, company=None):
 
 
 @frappe.whitelist()
+def get_pending_invoices_for_cbe(company, party_type, party, current_cbe=None):
+	if party_type not in ("Customer", "Supplier"):
+		return []
+
+	reference_doctype = "Sales Invoice" if party_type == "Customer" else "Purchase Invoice"
+	party_field = "customer" if party_type == "Customer" else "supplier"
+	pdc_subquery = _scaled_pdc_allocation_subquery(reference_doctype)
+	cbe_subquery = _cbe_allocation_subquery(reference_doctype)
+
+	supplier_invoice_expr = "COALESCE(inv.custom_supplier_invoice_no, '')"
+	customer_invoice_expr = "COALESCE(inv.bill_no, '')"
+
+	query = f"""
+		SELECT
+			inv.name,
+			{supplier_invoice_expr if reference_doctype == "Purchase Invoice" else "''"} AS custom_supplier_invoice_no,
+			{customer_invoice_expr if reference_doctype == "Sales Invoice" else "''"} AS custom_customer_invoice_no,
+			inv.grand_total,
+			inv.outstanding_amount,
+			(inv.outstanding_amount - {pdc_subquery} - {cbe_subquery}) AS remaining_allocatable
+		FROM `tab{reference_doctype}` inv
+		WHERE inv.docstatus = 1
+			AND inv.company = %(company)s
+			AND inv.{party_field} = %(party)s
+			AND inv.outstanding_amount > 0
+		ORDER BY inv.posting_date DESC, inv.name DESC
+	"""
+
+	values = {
+		"company": company,
+		"party": party,
+		"reference_doctype": reference_doctype,
+		"current_pdc": "",
+		"current_cbe": current_cbe or "",
+	}
+
+	rows = frappe.db.sql(query, values, as_dict=True)
+	return [row for row in rows if flt(row.remaining_allocatable) > 0.009]
+
+
+@frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def search_invoices_for_cbe(doctype, txt, searchfield, start, page_len, filters):
 	if isinstance(filters, str):
@@ -841,20 +1106,29 @@ def search_invoices_for_cbe(doctype, txt, searchfield, start, page_len, filters)
 	search_txt = (txt or "").strip()
 	start = int(start or 0)
 	page_len = int(page_len or 20)
+	current_cbe = filters.get("current_cbe") or ""
+	pdc_subquery = _scaled_pdc_allocation_subquery(reference_doctype)
+	cbe_subquery = _cbe_allocation_subquery(reference_doctype)
 
 	query = f"""
 		SELECT
 			inv.name,
 			inv.grand_total,
 			inv.outstanding_amount,
-			inv.outstanding_amount AS remaining_allocatable
+			(inv.outstanding_amount - {pdc_subquery} - {cbe_subquery}) AS remaining_allocatable
 		FROM `tab{reference_doctype}` inv
 		WHERE inv.docstatus = 1
 			AND inv.company = %(company)s
 			AND inv.{party_field} = %(party)s
 			AND inv.outstanding_amount > 0.009
 	"""
-	values = {"company": company, "party": party}
+	values = {
+		"company": company,
+		"party": party,
+		"reference_doctype": reference_doctype,
+		"current_pdc": "",
+		"current_cbe": current_cbe,
+	}
 
 	if search_txt:
 		if reference_doctype == "Purchase Invoice":
@@ -869,6 +1143,7 @@ def search_invoices_for_cbe(doctype, txt, searchfield, start, page_len, filters)
 		values["txt"] = f"%{search_txt}%"
 
 	query += """
+		HAVING remaining_allocatable > 0.009
 		ORDER BY inv.posting_date DESC, inv.name DESC
 		LIMIT %(start)s, %(page_len)s
 	"""
@@ -879,7 +1154,7 @@ def search_invoices_for_cbe(doctype, txt, searchfield, start, page_len, filters)
 
 
 @frappe.whitelist()
-def get_cbe_invoice_details(reference_doctype, invoices):
+def get_cbe_invoice_details(reference_doctype, invoices, current_cbe=None):
 	if isinstance(invoices, str):
 		invoices = frappe.parse_json(invoices)
 	invoices = list(dict.fromkeys(invoices or []))
@@ -896,5 +1171,7 @@ def get_cbe_invoice_details(reference_doctype, invoices):
 		order_by="posting_date desc, name desc",
 	)
 	for row in rows:
-		row["remaining_allocatable"] = flt(row.outstanding_amount)
-	return rows
+		row["remaining_allocatable"] = get_remaining_allocatable(
+			reference_doctype, row.name, current_cbe=current_cbe
+		)
+	return [row for row in rows if flt(row.remaining_allocatable) > 0.009]

@@ -34,12 +34,15 @@ def get_gl_entries(filters, accounting_dimensions):
 		gl_entries = _append_voucher_contra_entries(filters, accounting_dimensions, gl_entries)
 		gl_entries = _sort_gl_entries_by_voucher(gl_entries)
 
-	if (filters.get("party_type") or filters.get("party")) and _get_gl_setting(
-		"group_by_against_voucher_in_gl",
-		filters,
-		"group_by_against_voucher",
-	):
-		gl_entries = _sort_gl_entries_for_party(gl_entries)
+	if filters.get("party_type") or filters.get("party"):
+		group_by_against_voucher = bool(
+			_get_gl_setting(
+				"group_by_against_voucher_in_gl",
+				filters,
+				"group_by_against_voucher",
+			)
+		)
+		gl_entries = _sort_gl_entries_for_party(gl_entries, group_by_against_voucher)
 
 	return gl_entries
 
@@ -108,7 +111,7 @@ def _fetch_gl_entries_for_vouchers(filters, accounting_dimensions, vouchers):
 		from `tabGL Entry`
 		where company=%(company)s {base_conditions}
 			and ({voucher_conditions})
-		order by voucher_no, posting_date, account, creation
+		order by posting_date asc, voucher_no asc, account asc, creation asc
 		""",
 		frappe._dict(filters),
 		as_dict=1,
@@ -128,24 +131,29 @@ def _sort_gl_entries_by_voucher(gl_entries):
 	return sorted(
 		gl_entries,
 		key=lambda gle: (
-			gle.get("voucher_no") or "",
 			gle.get("posting_date") or "",
+			gle.get("voucher_no") or "",
 			gle.get("account") or "",
 			gle.get("creation") or "",
 		),
 	)
 
 
-def _sort_gl_entries_for_party(gl_entries):
-	return sorted(
-		gl_entries,
-		key=lambda gle: (
-			_group_key_for_party_sort(gle),
-			gle.get("posting_date") or "",
-			gle.get("voucher_no") or "",
-			gle.get("creation") or "",
-		),
-	)
+def _sort_gl_entries_for_party(gl_entries, group_by_against_voucher=False):
+	def sort_key(gle):
+		key = [gle.get("posting_date") or ""]
+		if group_by_against_voucher:
+			key.append(_group_key_for_party_sort(gle))
+		key.extend(
+			[
+				gle.get("voucher_no") or "",
+				gle.get("account") or "",
+				gle.get("creation") or "",
+			]
+		)
+		return tuple(key)
+
+	return sorted(gl_entries, key=sort_key)
 
 
 def _group_key_for_party_sort(gle):
