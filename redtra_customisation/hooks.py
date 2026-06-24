@@ -248,6 +248,13 @@ override_whitelisted_methods = {
 	"erpnext.accounts.services.payment_schedule.get_payment_term_details": (
 		"erpnext.controllers.accounts_controller.get_payment_term_details"
 	),
+	# Print View sends frm.doc as dict; Frappe typed API expects JSON string.
+	"frappe.www.printview.get_html_and_style": (
+		"redtra_customisation.override.printview.get_html_and_style"
+	),
+	"frappe.www.printview.get_rendered_raw_commands": (
+		"redtra_customisation.override.printview.get_rendered_raw_commands"
+	),
 }
 
 # Whitelisted methods
