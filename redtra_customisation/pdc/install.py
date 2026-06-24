@@ -7,6 +7,9 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from redtra_customisation.cbe.custom_fields import CBE_LINK_CUSTOM_FIELDS
 from redtra_customisation.pdc.custom_fields import PDC_CUSTOM_FIELDS
+from redtra_customisation.purchase_invoice.custom_fields import (
+	PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS,
+)
 from redtra_customisation.setup import get_sales_partner_commission_custom_fields, get_work_order_custom_fields
 
 
@@ -35,6 +38,7 @@ def after_install():
 	"""Create custom fields after app installation"""
 	create_custom_fields(PDC_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(CBE_LINK_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(get_sales_partner_commission_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()
@@ -45,6 +49,7 @@ def after_migrate():
 	"""Create custom fields after migration"""
 	create_custom_fields(PDC_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(CBE_LINK_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(get_sales_partner_commission_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()

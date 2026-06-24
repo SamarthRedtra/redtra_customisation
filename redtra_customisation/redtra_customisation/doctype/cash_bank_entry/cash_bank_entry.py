@@ -115,7 +115,12 @@ class CashBankEntry(Document):
 				inv_acc = frappe.db.get_value(ref_doctype, ref_name, acc_field)
 				if inv_acc and row.account != inv_acc:
 					row.account = inv_acc
+					row.account_currency = frappe.db.get_value("Account", inv_acc, "account_currency")
 					break
+
+		for row in self.get("accounts") or []:
+			if row.account and not row.account_currency:
+				row.account_currency = frappe.db.get_value("Account", row.account, "account_currency")
 
 
 	def before_insert(self):
@@ -239,10 +244,21 @@ class CashBankEntry(Document):
 	def set_multi_currency_flag(self):
 		company_currency = erpnext.get_company_currency(self.company)
 		multi = 0
-		if self.paid_account_currency and self.paid_account_currency != company_currency:
-			multi = 1
+		if self.paid_account:
+			paid_currency = self.paid_account_currency or frappe.db.get_value(
+				"Account", self.paid_account, "account_currency"
+			)
+			if paid_currency:
+				self.paid_account_currency = paid_currency
+			if paid_currency and paid_currency != company_currency:
+				multi = 1
 		for row in self.get("accounts") or []:
-			if row.account_currency and row.account_currency != company_currency:
+			row_currency = row.account_currency
+			if not row_currency and row.account:
+				row_currency = frappe.db.get_value("Account", row.account, "account_currency")
+				if row_currency:
+					row.account_currency = row_currency
+			if row_currency and row_currency != company_currency:
 				multi = 1
 		self.multi_currency = multi
 

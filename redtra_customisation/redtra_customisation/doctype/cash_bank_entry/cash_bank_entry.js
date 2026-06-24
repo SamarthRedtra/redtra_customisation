@@ -75,32 +75,68 @@ function recalculate_total(frm) {
 	frm.set_value("amount", total);
 }
 
+function fetch_row_account_currency(frm, cdt, cdn) {
+	const row = locals[cdt][cdn];
+	if (!row?.account) {
+		return Promise.resolve(null);
+	}
+	return frappe.db.get_value("Account", row.account, "account_currency").then(r => {
+		const currency = r.message?.account_currency;
+		if (currency && row.account_currency !== currency) {
+			return frappe.model.set_value(cdt, cdn, "account_currency", currency).then(() => currency);
+		}
+		return currency || row.account_currency;
+	});
+}
+
+function fetch_paid_account_currency(frm) {
+	if (!frm.doc.paid_account) {
+		return Promise.resolve(null);
+	}
+	return frappe.db.get_value("Account", frm.doc.paid_account, "account_currency").then(r => {
+		const currency = r.message?.account_currency;
+		if (currency && frm.doc.paid_account_currency !== currency) {
+			return frm.set_value("paid_account_currency", currency).then(() => currency);
+		}
+		return currency || frm.doc.paid_account_currency;
+	});
+}
+
+function sync_all_account_currencies(frm) {
+	const row_promises = (frm.doc.accounts || [])
+		.filter(row => row.account)
+		.map(row => fetch_row_account_currency(frm, row.doctype, row.name));
+	return Promise.all([fetch_paid_account_currency(frm), ...row_promises]);
+}
+
 function set_multi_currency_flag(frm) {
-	if (!frm.doc.company) return;
+	if (!frm.doc.company) return Promise.resolve();
 	const company_currency =
 		frappe.defaults.get_default("currency") ||
 		(frappe.boot.sysdefaults && frappe.boot.sysdefaults.currency);
-	frappe.db.get_value("Company", frm.doc.company, "default_currency").then(r => {
-		const cc = r.message?.default_currency || company_currency;
-		let multi = 0;
-		if (frm.doc.paid_account_currency && frm.doc.paid_account_currency !== cc) {
-			multi = 1;
-		}
-		(frm.doc.accounts || []).forEach(row => {
-			if (row.account_currency && row.account_currency !== cc) {
+	return sync_all_account_currencies(frm).then(() =>
+		frappe.db.get_value("Company", frm.doc.company, "default_currency").then(r => {
+			const cc = r.message?.default_currency || company_currency;
+			let multi = 0;
+			if (frm.doc.paid_account_currency && frm.doc.paid_account_currency !== cc) {
 				multi = 1;
 			}
-		});
-		frm.set_value("multi_currency", multi);
-		toggle_currency_columns(frm, multi);
-	});
+			(frm.doc.accounts || []).forEach(row => {
+				if (row.account_currency && row.account_currency !== cc) {
+					multi = 1;
+				}
+			});
+			frm.set_value("multi_currency", multi);
+			toggle_currency_columns(frm, multi);
+		})
+	);
 }
 
 function toggle_currency_columns(frm, multi) {
 	const grid = frm.fields_dict.accounts?.grid;
 	if (!grid) return;
-	const fields = ["account_currency", "exchange_rate", "amount_in_company_currency"];
-	grid.set_column_disp(fields, multi);
+	grid.set_column_disp(["account_currency"], true);
+	grid.set_column_disp(["exchange_rate", "amount_in_company_currency"], multi);
 }
 
 function default_row_dimensions(frm, cdt, cdn) {
@@ -225,18 +261,25 @@ function clear_invoice_refs_for_row(frm, row) {
 function sync_row_from_invoice_refs(frm, row) {
 	const refs = get_invoice_refs_for_row(frm, row);
 	if (!refs.length) {
-		return;
+		return Promise.resolve();
 	}
 	const total = refs.reduce((sum, ref) => sum + flt(ref.allocated_amount), 0);
-	frappe.model.set_value(row.doctype, row.name, "amount", total);
-	frappe.model.set_value(row.doctype, row.name, "allocated_amount", total);
 	const first = refs[0];
-	frappe.model.set_value(row.doctype, row.name, "reference_doctype", first.reference_doctype);
-	frappe.model.set_value(row.doctype, row.name, "reference_name", first.reference_name);
+	const updates = [
+		frappe.model.set_value(row.doctype, row.name, "amount", total),
+		frappe.model.set_value(row.doctype, row.name, "allocated_amount", total),
+		frappe.model.set_value(row.doctype, row.name, "reference_doctype", first.reference_doctype),
+		frappe.model.set_value(row.doctype, row.name, "reference_name", first.reference_name),
+	];
 	if (first.account) {
-		frappe.model.set_value(row.doctype, row.name, "account", first.account);
+		updates.push(frappe.model.set_value(row.doctype, row.name, "account", first.account));
 	}
-	recalculate_total(frm);
+	return Promise.all(updates)
+		.then(() => fetch_row_account_currency(frm, row.doctype, row.name))
+		.then(() => {
+			recalculate_total(frm);
+			return set_multi_currency_flag(frm);
+		});
 }
 
 function fetch_invoices_for_row(frm, row) {
@@ -566,8 +609,10 @@ frappe.ui.form.on("Cash Bank Entry", {
 		}
 	},
 	paid_account(frm) {
-		fetch_paid_account_exchange_rate(frm);
-		set_multi_currency_flag(frm);
+		fetch_paid_account_currency(frm).then(() => {
+			set_multi_currency_flag(frm);
+			fetch_paid_account_exchange_rate(frm);
+		});
 	},
 	settlement_mode(frm) {
 		// No alert needed as both PE and PDC support row-by-row multi-party settlement.
@@ -597,8 +642,10 @@ frappe.ui.form.on("Cash Bank Entry Account", {
 		}
 	},
 	account(frm, cdt, cdn) {
-		fetch_exchange_rate(frm, cdt, cdn);
-		set_multi_currency_flag(frm);
+		fetch_row_account_currency(frm, cdt, cdn).then(() => {
+			set_multi_currency_flag(frm);
+			fetch_exchange_rate(frm, cdt, cdn);
+		});
 	},
 	fetch_invoice(frm, cdt, cdn) {
 		fetch_invoices_for_row(frm, locals[cdt][cdn]);

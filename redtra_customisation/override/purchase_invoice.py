@@ -6,14 +6,45 @@ from erpnext.accounts.doctype.purchase_invoice.purchase_invoice import PurchaseI
 from erpnext.assets.doctype.asset.asset import is_cwip_accounting_enabled
 from erpnext.assets.doctype.asset_category.asset_category import get_asset_category_account
 from frappe import _, throw
-from frappe.utils import get_link_to_form
+from frappe.utils import cint, flt, get_link_to_form
 
 from redtra_customisation.override.purchase_invoice_expense_account import (
 	is_any_account_allowed_on_pi,
 )
+from redtra_customisation.override.purchase_invoice_point_adjustment import (
+	apply_point_adjustments,
+	sync_point_adjustment_rows,
+)
 
 
 class CustomPurchaseInvoice(PurchaseInvoice):
+	def calculate_taxes_and_totals(self):
+		super().calculate_taxes_and_totals()
+		if self.get("point_adjustments"):
+			sync_point_adjustment_rows(self)
+			apply_point_adjustments(self)
+
+	def validate_point_adjustments(self):
+		if not self.get("point_adjustments"):
+			return
+
+		item_by_idx = {cint(row.idx): row for row in self.get("items") or []}
+		for adj in self.get("point_adjustments"):
+			if not item_by_idx.get(cint(adj.item_row)):
+				frappe.throw(
+					_("Point Adjustment row {0}: Item Row #{1} does not exist.").format(
+						adj.idx, adj.item_row
+					)
+				)
+			if not flt(adj.adjustment_amount):
+				frappe.throw(
+					_("Point Adjustment row {0}: Adjustment Amount is required.").format(adj.idx)
+				)
+
+	def validate(self):
+		self.validate_point_adjustments()
+		super().validate()
+
 	def set_expense_account(self, for_validate=False):
 		if not is_any_account_allowed_on_pi():
 			return super().set_expense_account(for_validate)
