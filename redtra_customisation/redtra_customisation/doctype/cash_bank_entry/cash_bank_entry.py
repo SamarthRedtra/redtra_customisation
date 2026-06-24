@@ -9,7 +9,7 @@ from erpnext.accounts.doctype.journal_entry.journal_entry import get_exchange_ra
 from erpnext.accounts.party import get_party_account, get_party_account_currency
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 
 def get_allowed_party_accounts(company, party_type, party):
@@ -90,6 +90,7 @@ def get_allowed_party_accounts(company, party_type, party):
 
 class CashBankEntry(Document):
 	def validate(self):
+		self.sync_invoice_reference_account_rows()
 		self.set_journal_naming_series()
 		self.set_invoice_accounts()
 		self.set_row_amounts()
@@ -330,13 +331,13 @@ class CashBankEntry(Document):
 			if not inv_ref.account_row:
 				frappe.throw(_("Invoice Reference row {0}: Account line link is missing.").format(inv_ref.idx))
 
-			account_row = self._get_account_row_by_name(inv_ref.account_row)
+			account_row = self._get_account_row_for_invoice_ref(inv_ref)
 			if not account_row:
 				frappe.throw(
 					_("Invoice Reference row {0}: Linked account line no longer exists.").format(inv_ref.idx)
 				)
 
-			row_key = inv_ref.account_row
+			row_key = account_row.name
 			seen_by_row.setdefault(row_key, set())
 			if inv_ref.reference_name in seen_by_row[row_key]:
 				frappe.throw(
@@ -374,6 +375,40 @@ class CashBankEntry(Document):
 			self._validate_single_invoice_reference(
 				row, row.reference_doctype, row.reference_name, allocated
 			)
+
+	def sync_invoice_reference_account_rows(self):
+		"""Re-link invoice refs when account row names change on first save."""
+		if self.settlement_mode not in ("Payment Entry", "Post Dated Cheque"):
+			return
+
+		account_rows = list(self.get("accounts") or [])
+		by_name = {row.name: row for row in account_rows}
+		by_idx = {row.idx: row for row in account_rows}
+		orphaned = []
+
+		for inv_ref in self.get("invoice_references") or []:
+			if inv_ref.account_row and inv_ref.account_row in by_name:
+				inv_ref.account_row_idx = by_name[inv_ref.account_row].idx
+				continue
+
+			if inv_ref.account_row_idx and inv_ref.account_row_idx in by_idx:
+				inv_ref.account_row = by_idx[inv_ref.account_row_idx].name
+				continue
+
+			orphaned.append(inv_ref)
+
+		for inv_ref in orphaned:
+			self.remove(inv_ref)
+
+	def _get_account_row_for_invoice_ref(self, inv_ref):
+		for row in self.get("accounts") or []:
+			if row.name == inv_ref.account_row:
+				return row
+		if inv_ref.account_row_idx:
+			for row in self.get("accounts") or []:
+				if row.idx == inv_ref.account_row_idx:
+					return row
+		return None
 
 	def _get_account_row_by_name(self, account_row_name):
 		for row in self.get("accounts") or []:
@@ -845,9 +880,15 @@ def get_invoice_refs_for_cbe_row(doc, row):
 	child_refs = [
 		ref
 		for ref in doc.get("invoice_references") or []
-		if ref.account_row == row.name and ref.reference_name
+		if ref.reference_name
+		and (ref.account_row == row.name or cint(ref.account_row_idx) == cint(row.idx))
 	]
 	if child_refs:
+		for ref in child_refs:
+			if ref.account_row != row.name:
+				ref.account_row = row.name
+			if cint(ref.account_row_idx) != cint(row.idx):
+				ref.account_row_idx = row.idx
 		return child_refs
 	return []
 

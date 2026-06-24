@@ -195,12 +195,29 @@ function compute_row_tax(frm, cdt, cdn) {
 }
 
 function get_invoice_refs_for_row(frm, row) {
-	return (frm.doc.invoice_references || []).filter(ref => ref.account_row === row.name);
+	return (frm.doc.invoice_references || []).filter(
+		ref => ref.account_row === row.name || cint(ref.account_row_idx) === cint(row.idx)
+	);
+}
+
+function sync_invoice_ref_account_rows(frm) {
+	(frm.doc.invoice_references || []).forEach(ref => {
+		const row = (frm.doc.accounts || []).find(
+			account_row =>
+				account_row.name === ref.account_row || cint(account_row.idx) === cint(ref.account_row_idx)
+		);
+		if (row) {
+			ref.account_row = row.name;
+			ref.account_row_idx = row.idx;
+		}
+	});
 }
 
 function clear_invoice_refs_for_row(frm, row) {
 	(frm.doc.invoice_references || [])
-		.filter(ref => ref.account_row === row.name)
+		.filter(
+			ref => ref.account_row === row.name || cint(ref.account_row_idx) === cint(row.idx)
+		)
 		.forEach(ref => frappe.model.clear_doc(ref.doctype, ref.name));
 	frm.refresh_field("invoice_references");
 }
@@ -483,6 +500,9 @@ frappe.ui.form.on("Cash Bank Entry", {
 	onload(frm) {
 		set_paid_account_query(frm);
 		setup_journal_naming_series(frm);
+	},
+	before_save(frm) {
+		sync_invoice_ref_account_rows(frm);
 	},
 	refresh(frm) {
 		set_paid_account_query(frm);
