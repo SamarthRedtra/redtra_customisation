@@ -249,7 +249,7 @@ class TestProvisionalPurchaseOrder(UnitTestCase):
 			return_value=False,
 		):
 			with patch(
-				"erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_receipt",
+				"erpnext.buying.doctype.purchase_order.mapper.make_purchase_receipt",
 				return_value={"name": "PR-1"},
 			) as erpnext_make:
 				result = make_provisional_purchase_receipt("PO-TEST")

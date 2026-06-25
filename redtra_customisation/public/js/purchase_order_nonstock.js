@@ -84,10 +84,16 @@ function setup_provisional_purchase_receipt_button(frm) {
 				frm.add_custom_button(
 					__("Purchase Receipt"),
 					() => {
+						if (frm.doc.__unsaved) {
+							frappe.throw(
+								__("You have unsaved changes in this form. Please save before you continue.")
+							);
+						}
+
 						frappe.model.open_mapped_doc({
 							method:
 								"redtra_customisation.override.provisional_purchase_order.make_provisional_purchase_receipt",
-							frm,
+							source_name: frm.doc.name,
 							freeze_message: __("Creating Purchase Receipt ..."),
 						});
 					},

@@ -242,7 +242,7 @@ def update_po_items_with_restrictions(parent_doctype_name: str, trans_items: str
 def make_provisional_purchase_receipt(source_name, target_doc=None, args=None):
 	"""Create Purchase Receipt from an open/provisional PO (supports multiple receipts)."""
 	from frappe.model.mapper import get_mapped_doc
-	from erpnext.buying.doctype.purchase_order.purchase_order import (
+	from erpnext.buying.doctype.purchase_order.mapper import (
 		make_purchase_receipt as erpnext_make_purchase_receipt,
 		set_missing_values,
 	)

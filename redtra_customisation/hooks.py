@@ -255,6 +255,18 @@ override_whitelisted_methods = {
 	"frappe.www.printview.get_rendered_raw_commands": (
 		"redtra_customisation.override.printview.get_rendered_raw_commands"
 	),
+	"frappe.model.mapper.make_mapped_doc": (
+		"redtra_customisation.override.mapper.make_mapped_doc"
+	),
+	"frappe.model.mapper.map_docs": (
+		"redtra_customisation.override.mapper.map_docs"
+	),
+	"erpnext.stock.doctype.purchase_receipt.purchase_receipt.make_purchase_invoice": (
+		"erpnext.stock.doctype.purchase_receipt.mapper.make_purchase_invoice"
+	),
+	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": (
+		"erpnext.selling.doctype.sales_order.mapper.make_sales_invoice"
+	),
 }
 
 # Whitelisted methods
