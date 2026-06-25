@@ -89,10 +89,17 @@ def get_overtime_custom_fields():
 		],
 		"Salary Slip": [
 			{
+				"fieldname": "custom_avoid_absenteeism",
+				"fieldtype": "Check",
+				"label": "Avoid Absenteeism",
+				"insert_after": "payment_days",
+				"default": "0",
+			},
+			{
 				"fieldname": "overtime_section",
 				"fieldtype": "Section Break",
 				"label": "Overtime",
-				"insert_after": "payment_days",
+				"insert_after": "custom_avoid_absenteeism",
 			},
 			{
 				"fieldname": "overtime_requests",
@@ -102,7 +109,6 @@ def get_overtime_custom_fields():
 				"insert_after": "overtime_section",
 			},
 			{
-				# Add the total field here as a fallback for sites where HRMS did not create it.
 				"fieldname": "total_overtime_hours",
 				"fieldtype": "Float",
 				"label": "Total Overtime Hours",
@@ -123,6 +129,20 @@ def get_overtime_custom_fields():
 				"label": "Food Allowance Counts",
 				"read_only": 1,
 				"insert_after": "holidays_overtime_hours",
+			},
+		],
+		"Employee Attendance Tool": [
+			{
+				"fieldname": "custom_from_date",
+				"fieldtype": "Date",
+				"label": "From Date",
+				"insert_after": "date",
+			},
+			{
+				"fieldname": "custom_to_date",
+				"fieldtype": "Date",
+				"label": "To Date",
+				"insert_after": "custom_from_date",
 			},
 		],
 	}

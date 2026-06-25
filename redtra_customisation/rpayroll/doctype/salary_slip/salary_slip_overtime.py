@@ -5,12 +5,17 @@ import frappe
 from frappe.query_builder.functions import Count
 from frappe.utils import flt
 
-from hrms.payroll.doctype.salary_slip.salary_slip import SalarySlip
+from hrms.payroll.doctype.salary_slip.salary_slip import (
+	SalarySlip,
+	get_period_factor,
+	set_loan_repayment,
+)
 from redtra_customisation.rpayroll.overtime_helpers import (
 	compute_food_allowance_counts,
 	get_overtime_requests_for_period,
 	submit_draft_food_allowance_for_employee_period,
 )
+from frappe.utils import cint
 
 
 class SalarySlipOvertime(SalarySlip):
@@ -29,6 +34,18 @@ class SalarySlipOvertime(SalarySlip):
 		super().validate()
 		if self.employee and self.start_date and self.end_date:
 			self.set_overtime_details()
+
+	def calculate_net_pay(self, skip_tax_breakup_computation: bool = False):
+		super().calculate_net_pay(skip_tax_breakup_computation=skip_tax_breakup_computation)
+		if getattr(self, "custom_avoid_absenteeism", 0):
+			# Filter out standard Absenteeism Penalty and any other Absenteeism Deduction
+			self.set("deductions", [d for d in (self.deductions or []) if d.salary_component not in ("Absenteeism Penalty", "Absenteeism Deduction")])
+			
+			# Recalculate totals
+			self.set_precision_for_component_amounts()
+			self.set_net_pay()
+			if not skip_tax_breakup_computation:
+				self.compute_income_tax_breakup()
 
 	def set_overtime_details(self):
 		has_overtime_requests = bool(self.meta.get_field("overtime_requests"))

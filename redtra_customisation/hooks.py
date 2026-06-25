@@ -69,6 +69,8 @@ doctype_js = {
 	],
 	"Item": "public/js/item_expense_account.js",
 	"Cash Bank Entry": "redtra_customisation/doctype/cash_bank_entry/cash_bank_entry.js",
+	"Salary Slip": "public/js/salary_slip_custom.js",
+	"Employee Attendance Tool": "public/js/employee_attendance_tool_custom.js",
 }
 doctype_list_js = {
 	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques_list.js",
@@ -266,6 +268,9 @@ override_whitelisted_methods = {
 	),
 	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": (
 		"erpnext.selling.doctype.sales_order.mapper.make_sales_invoice"
+	),
+	"hrms.hr.doctype.employee_attendance_tool.employee_attendance_tool.mark_employee_attendance": (
+		"redtra_customisation.rhr.employee_attendance_tool_custom.mark_employee_attendance"
 	),
 }
 

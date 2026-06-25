@@ -13,3 +13,4 @@ redtra_customisation.patches.v16_0.add_cash_bank_entry_je_link
 redtra_customisation.patches.v16_0.add_gl_contra_setting_defaults #33
 redtra_customisation.patches.v16_0.add_provisional_po_settings_defaults
 redtra_customisation.patches.v16_0.add_provisional_po_field_order
+redtra_customisation.patches.v16_0.add_avoid_absenteeism_and_attendance_range_fields
