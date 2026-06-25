@@ -272,6 +272,9 @@ override_whitelisted_methods = {
 	"hrms.hr.doctype.employee_attendance_tool.employee_attendance_tool.mark_employee_attendance": (
 		"redtra_customisation.rhr.employee_attendance_tool_custom.mark_employee_attendance"
 	),
+	"frappe.desk.query_report.get_data_for_custom_field": (
+		"redtra_customisation.override.query_report.get_data_for_custom_field"
+	),
 }
 
 # Whitelisted methods
