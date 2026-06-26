@@ -1,0 +1,99 @@
+{%
+	/*
+	 * Attendance Breakup – Report Print Template
+	 * One table per employee (grouped by salary slip).
+	 * Each employee group is separated by a CSS page break.
+	 */
+
+	var report_columns = report.get_columns_for_print();
+
+	// Group rows by employee
+	var employees = {};
+	var employee_order = [];
+	for (var j = 0; j < data.length; j++) {
+		var row = data[j];
+		var emp_key = row["employee"];
+		if (!employees[emp_key]) {
+			employees[emp_key] = {
+				employee: row["employee"],
+				employee_name: row["employee_name"],
+				rows: []
+			};
+			employee_order.push(emp_key);
+		}
+		employees[emp_key].rows.push(row);
+	}
+%}
+
+<style>
+	@page { size: A4 landscape; margin: 12mm; }
+	body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; color: #222; }
+	.emp-section { page-break-after: always; margin-bottom: 20px; }
+	.emp-section:last-child { page-break-after: avoid; }
+	.emp-header { background: #1a3a5c; color: #fff; padding: 6px 10px; margin-bottom: 6px; }
+	.emp-header h3 { margin: 0; font-size: 11pt; }
+	.emp-header .meta { font-size: 8pt; opacity: 0.85; margin-top: 2px; }
+	.report-title { text-align: center; font-size: 13pt; font-weight: bold; margin-bottom: 4px; }
+	.date-range { text-align: center; font-size: 9pt; color: #555; margin-bottom: 8px; }
+	table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+	th { background: #2c5f8a; color: #fff; padding: 4px 6px; text-align: center; border: 1px solid #1a3a5c; }
+	td { padding: 3px 6px; border: 1px solid #ccc; text-align: center; }
+	tr:nth-child(even) td { background: #f5f8fc; }
+	.letter-head-wrap { text-align: center; margin-bottom: 8px; }
+</style>
+
+{% for (var e = 0; e < employee_order.length; e++) { %}
+{%
+	var emp_key = employee_order[e];
+	var emp_data = employees[emp_key];
+%}
+<div class="emp-section">
+	<div class="letter-head-wrap">
+		{%= frappe.boot.letter_heads[filters.letter_head || frappe.defaults.get_default("letter_head")]
+			? frappe.boot.letter_heads[filters.letter_head || frappe.defaults.get_default("letter_head")].header
+			: "" %}
+	</div>
+	<h2 class="report-title">{%= __(report.report_name) %}</h2>
+	<p class="date-range">
+		{%= __("From {0} to {1}", [frappe.datetime.str_to_user(filters.from_date), frappe.datetime.str_to_user(filters.to_date)]) %}
+	</p>
+	<div class="emp-header">
+		<h3>{%= emp_data.employee_name %} ({%= emp_data.employee %})</h3>
+	</div>
+	<table>
+		<thead>
+			<tr>
+				{% for (var i = 2; i < report_columns.length; i++) { %}
+					<th>{%= report_columns[i].label %}</th>
+				{% } %}
+			</tr>
+		</thead>
+		<tbody>
+			{% for (var r = 0; r < emp_data.rows.length; r++) { %}
+			{%
+				var row = emp_data.rows[r];
+			%}
+			<tr>
+				{% for (var i = 2; i < report_columns.length; i++) { %}
+				<td>
+					{% var fieldname = report_columns[i].fieldname; %}
+					{% if (report_columns[i].fieldtype == 'Currency' && !isNaN(row[fieldname])) { %}
+						{%= format_currency(row[fieldname]) %}
+					{% } else if (report_columns[i].fieldtype == 'Date' && row[fieldname]) { %}
+						{%= frappe.datetime.str_to_user(row[fieldname]) %}
+					{% } else if (!is_null(row[fieldname])) { %}
+						{%= row[fieldname] %}
+					{% } else { %}
+						-
+					{% } %}
+				</td>
+				{% } %}
+			</tr>
+			{% } %}
+		</tbody>
+	</table>
+	<p class="text-right text-muted" style="font-size:7.5pt; margin-top:4px;">
+		{%= __("Printed On {0}", [frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string())]) %}
+	</p>
+</div>
+{% } %}
