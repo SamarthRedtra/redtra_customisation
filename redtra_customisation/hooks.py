@@ -69,8 +69,6 @@ doctype_js = {
 	],
 	"Item": "public/js/item_expense_account.js",
 	"Cash Bank Entry": "redtra_customisation/doctype/cash_bank_entry/cash_bank_entry.js",
-	"Salary Slip": "public/js/salary_slip_custom.js",
-	"Employee Attendance Tool": "public/js/employee_attendance_tool_custom.js",
 }
 doctype_list_js = {
 	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques_list.js",
@@ -257,24 +255,11 @@ override_whitelisted_methods = {
 	"frappe.www.printview.get_rendered_raw_commands": (
 		"redtra_customisation.override.printview.get_rendered_raw_commands"
 	),
+	# open_mapped_doc sends selected_children as {} when no child rows are checked.
 	"frappe.model.mapper.make_mapped_doc": (
 		"redtra_customisation.override.mapper.make_mapped_doc"
 	),
-	"frappe.model.mapper.map_docs": (
-		"redtra_customisation.override.mapper.map_docs"
-	),
-	"erpnext.stock.doctype.purchase_receipt.purchase_receipt.make_purchase_invoice": (
-		"erpnext.stock.doctype.purchase_receipt.mapper.make_purchase_invoice"
-	),
-	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": (
-		"erpnext.selling.doctype.sales_order.mapper.make_sales_invoice"
-	),
-	"hrms.hr.doctype.employee_attendance_tool.employee_attendance_tool.mark_employee_attendance": (
-		"redtra_customisation.rhr.employee_attendance_tool_custom.mark_employee_attendance"
-	),
-	"frappe.desk.query_report.get_data_for_custom_field": (
-		"redtra_customisation.override.query_report.get_data_for_custom_field"
-	),
+	"frappe.model.mapper.map_docs": "redtra_customisation.override.mapper.map_docs",
 }
 
 # Whitelisted methods

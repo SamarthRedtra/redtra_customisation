@@ -2,16 +2,17 @@
 
 import frappe
 
+
 @frappe.whitelist()
-def make_mapped_doc(
-	method: str, source_name: str, selected_children=None, args=None
-):
-	"""Override for frappe.model.mapper.make_mapped_doc to support selected_children as dict."""
+def make_mapped_doc(method: str, source_name: str, selected_children=None, args=None):
+	"""Accept selected_children as dict from open_mapped_doc (frm.get_selected())."""
 	method_attr = frappe.get_attr(frappe.override_whitelisted_method(method))
 
 	frappe.is_whitelisted(method_attr)
 
-	if selected_children:
+	if isinstance(selected_children, dict) and not selected_children:
+		selected_children = None
+	elif selected_children:
 		selected_children = frappe.parse_json(selected_children)
 
 	if args:
@@ -23,10 +24,8 @@ def make_mapped_doc(
 
 
 @frappe.whitelist()
-def map_docs(
-	method: str, source_names, target_doc, args=None
-):
-	"""Override for frappe.model.mapper.map_docs to convert target_doc dict to Document."""
+def map_docs(method: str, source_names, target_doc, args=None):
+	"""Accept target_doc as dict from client-side map_docs calls."""
 	method_attr = frappe.get_attr(frappe.override_whitelisted_method(method))
 
 	frappe.is_whitelisted(method_attr)
