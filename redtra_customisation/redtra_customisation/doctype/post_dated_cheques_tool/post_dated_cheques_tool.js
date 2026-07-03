@@ -84,6 +84,7 @@ async function fetch_pending(frm, pdc_name = null) {
 		(r.message || []).forEach((d) => {
 			const row = frm.add_child("cheques_details");
 			row.pdc = d.name;
+			row.reference_no = d.reference_no;
 			row.mode_of_payment = d.mode_of_payment;
 			row.payment_type = d.payment_type;
 			row.reference_date = d.reference_date;

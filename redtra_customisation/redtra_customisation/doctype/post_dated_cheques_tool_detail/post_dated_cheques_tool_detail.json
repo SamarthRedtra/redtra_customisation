@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "pdc",
+  "reference_no",
   "mode_of_payment",
   "payment_type",
   "reference_date",
@@ -27,6 +28,13 @@
    "link_filters": "[[\"Post Dated Cheques\",\"docstatus\",\"=\",\"1\"]]",
    "options": "Post Dated Cheques",
    "reqd": 1
+  },
+  {
+   "fieldname": "reference_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Cheque No",
+   "read_only": 1
   },
   {
    "fieldname": "mode_of_payment",
