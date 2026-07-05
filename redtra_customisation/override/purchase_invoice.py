@@ -15,6 +15,13 @@ from redtra_customisation.override.purchase_invoice_point_adjustment import (
 	apply_point_adjustments,
 	sync_point_adjustment_rows,
 )
+from redtra_customisation.override.purchase_invoice_point_adjustment_gl import (
+	build_point_adjustment_gl_entries,
+)
+from redtra_customisation.override.purchase_invoice_point_adjustment_settings import (
+	get_pi_point_adjustment_account,
+	is_pi_point_adjustment_gl_split_enabled,
+)
 
 
 class CustomPurchaseInvoice(PurchaseInvoice):
@@ -43,7 +50,24 @@ class CustomPurchaseInvoice(PurchaseInvoice):
 
 	def validate(self):
 		self.validate_point_adjustments()
+		self.validate_point_adjustment_gl_split()
 		super().validate()
+
+	def validate_point_adjustment_gl_split(self):
+		if not self.get("point_adjustments"):
+			return
+
+		if is_pi_point_adjustment_gl_split_enabled() and not get_pi_point_adjustment_account():
+			frappe.throw(
+				_("Set Purchase Invoice Point Adjustment Account in Redtra Custom Setting")
+			)
+
+	def get_gl_entries(self, inventory_account_map=None):
+		gl_entries = super().get_gl_entries(inventory_account_map)
+		if not is_pi_point_adjustment_gl_split_enabled() or not self.get("point_adjustments"):
+			return gl_entries
+
+		return gl_entries + build_point_adjustment_gl_entries(self)
 
 	def set_expense_account(self, for_validate=False):
 		if not is_any_account_allowed_on_pi():

@@ -1,10 +1,13 @@
 # Copyright (c) 2026, redtra_customisation contributors
 
 import frappe
+import erpnext
 from frappe import _
 from frappe.utils import cint, flt
 
-import erpnext
+from redtra_customisation.override.purchase_invoice_point_adjustment_settings import (
+	is_pi_point_adjustment_gl_split_enabled,
+)
 
 
 def sync_point_adjustment_rows(doc):
@@ -33,6 +36,7 @@ def sync_point_adjustment_rows(doc):
 def apply_point_adjustments(doc):
 	adjustments = doc.get("point_adjustments") or []
 	adjustment_by_item = {}
+	gl_split = is_pi_point_adjustment_gl_split_enabled()
 
 	for adj in adjustments:
 		if not adj.purchase_invoice_item:
@@ -52,12 +56,16 @@ def apply_point_adjustments(doc):
 			base_adjustment = flt(
 				item_adjustment * conversion_rate, item.precision("base_net_amount")
 			)
-			item.net_amount = flt(item.net_amount) + item_adjustment
-			item.base_net_amount = flt(item.base_net_amount) + base_adjustment
+			if not gl_split:
+				item.net_amount = flt(item.net_amount) + item_adjustment
+				item.base_net_amount = flt(item.base_net_amount) + base_adjustment
 			total_adjustment += item_adjustment
 			base_total_adjustment += base_adjustment
 
-		item.custom_adjusted_net_amount = flt(item.net_amount)
+		if gl_split and item_adjustment:
+			item.custom_adjusted_net_amount = flt(item.net_amount) + item_adjustment
+		else:
+			item.custom_adjusted_net_amount = flt(item.net_amount)
 
 	doc.custom_total_point_adjustment = total_adjustment
 

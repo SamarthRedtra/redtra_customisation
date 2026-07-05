@@ -25,6 +25,8 @@
     "restrict_non_stockable_item_user",
     "purchase_invoice_section",
     "allow_any_account_on_purchase_invoice",
+    "enable_purchase_invoice_point_adjustment_gl_split",
+    "purchase_invoice_point_adjustment_account",
     "general_ledger_section",
     "include_against_account_entries_in_gl",
     "group_by_against_voucher_in_gl",
@@ -159,6 +161,22 @@
       "fieldtype": "Check",
       "label": "Allow Any Account on Purchase Invoice Expense Head",
       "description": "When enabled, users can select any non-group account for the company on PI item Expense Head (Asset, Liability, Equity, Income, or Expense)."
+    },
+    {
+      "default": "0",
+      "fieldname": "enable_purchase_invoice_point_adjustment_gl_split",
+      "fieldtype": "Check",
+      "label": "Split Purchase Invoice Point Adjustment in GL",
+      "description": "When enabled, point adjustments post to a separate adjustment account while item expense keeps the base amount."
+    },
+    {
+      "depends_on": "eval:doc.enable_purchase_invoice_point_adjustment_gl_split",
+      "fieldname": "purchase_invoice_point_adjustment_account",
+      "fieldtype": "Link",
+      "label": "Purchase Invoice Point Adjustment Account",
+      "mandatory_depends_on": "eval:doc.enable_purchase_invoice_point_adjustment_gl_split",
+      "options": "Account",
+      "description": "Debit account used for Purchase Invoice point adjustment amounts when GL split is enabled."
     },
     {
       "fieldname": "general_ledger_section",
