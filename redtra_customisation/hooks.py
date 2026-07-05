@@ -65,7 +65,7 @@ doctype_js = {
 	"Purchase Order": "public/js/purchase_order_nonstock.js",
 	"Purchase Invoice": [
 		"public/js/purchase_invoice_expense_account.js",
-		"public/js/purchase_invoice_point_adjustment.js",
+		"public/js/purchase_invoice_rounding.js",
 	],
 	"Item": "public/js/item_expense_account.js",
 	"Cash Bank Entry": "redtra_customisation/doctype/cash_bank_entry/cash_bank_entry.js",

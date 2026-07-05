@@ -1,5 +1,19 @@
-"""Custom fields for Purchase Invoice point-level adjustments."""
+"""Custom fields for Purchase Invoice rounding."""
 
+PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS = {
+	"Purchase Invoice": [
+		{
+			"fieldname": "custom_round_off_account",
+			"fieldtype": "Link",
+			"label": "Round Off Account",
+			"options": "Account",
+			"insert_after": "rounding_adjustment",
+			"description": "Optional override for rounding GL posting. Defaults to Company Round Off Account.",
+		},
+	],
+}
+
+# Legacy point-adjustment fields kept hidden for existing data compatibility.
 PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS = {
 	"Purchase Invoice": [
 		{
@@ -8,6 +22,7 @@ PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS = {
 			"label": "Point Adjustments",
 			"insert_after": "items",
 			"collapsible": 1,
+			"hidden": 1,
 		},
 		{
 			"fieldname": "point_adjustments",
@@ -15,6 +30,7 @@ PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS = {
 			"label": "Point Adjustments",
 			"options": "Purchase Invoice Point Adjustment",
 			"insert_after": "point_adjustments_section",
+			"hidden": 1,
 		},
 		{
 			"fieldname": "custom_total_point_adjustment",
@@ -22,6 +38,7 @@ PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS = {
 			"label": "Total Point Adjustment",
 			"insert_after": "point_adjustments",
 			"read_only": 1,
+			"hidden": 1,
 		},
 	],
 	"Purchase Invoice Item": [
@@ -31,7 +48,7 @@ PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS = {
 			"label": "Point Adjustment",
 			"insert_after": "amount",
 			"read_only": 1,
-			"in_list_view": 1,
+			"hidden": 1,
 		},
 		{
 			"fieldname": "custom_adjusted_net_amount",
@@ -39,6 +56,7 @@ PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS = {
 			"label": "Adjusted Net Amount",
 			"insert_after": "custom_point_adjustment_total",
 			"read_only": 1,
+			"hidden": 1,
 		},
 	],
 }

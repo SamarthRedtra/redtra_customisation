@@ -12,7 +12,6 @@ class RedtraCustomSetting(Document):
 		self.validate_sales_partner_commission_percentage()
 		self.ensure_default_project_commission_slabs()
 		self.validate_project_commission_slabs()
-		self.validate_purchase_invoice_point_adjustment_account()
 
 	def validate_sales_partner_commission_percentage(self):
 		commission_percentage = self.get("sales_partner_comssion_percentage")
@@ -65,12 +64,3 @@ class RedtraCustomSetting(Document):
 				frappe.throw(_("Open-ended project commission slab must be the last row"))
 
 			last_maximum = maximum_value
-
-	def validate_purchase_invoice_point_adjustment_account(self):
-		if not self.get("enable_purchase_invoice_point_adjustment_gl_split"):
-			return
-
-		if not self.get("purchase_invoice_point_adjustment_account"):
-			frappe.throw(
-				_("Purchase Invoice Point Adjustment Account is required when GL split is enabled")
-			)

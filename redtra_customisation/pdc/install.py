@@ -9,6 +9,7 @@ from redtra_customisation.cbe.custom_fields import CBE_LINK_CUSTOM_FIELDS
 from redtra_customisation.pdc.custom_fields import PDC_CUSTOM_FIELDS
 from redtra_customisation.purchase_invoice.custom_fields import (
 	PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS,
+	PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS,
 )
 from redtra_customisation.setup import get_sales_partner_commission_custom_fields, get_work_order_custom_fields
 
@@ -34,11 +35,49 @@ def create_property_setters():
 		frappe.db.commit()
 
 
+	if not frappe.db.exists("Property Setter", {
+		"doc_type": "Purchase Invoice",
+		"field_name": "disable_rounded_total",
+		"property": "default",
+		"name": "Purchase Invoice-disable_rounded_total-redtra-default",
+	}):
+		frappe.get_doc({
+			"doctype": "Property Setter",
+			"doctype_or_field": "DocField",
+			"doc_type": "Purchase Invoice",
+			"field_name": "disable_rounded_total",
+			"property": "default",
+			"value": "0",
+			"property_type": "Text",
+			"is_system_generated": 0,
+			"name": "Purchase Invoice-disable_rounded_total-redtra-default",
+		}).insert(ignore_permissions=True)
+		frappe.db.commit()
+
+	for field_name in ("rounding_adjustment", "rounded_total"):
+		ps_name = f"Purchase Invoice-{field_name}-redtra-read_only"
+		if frappe.db.exists("Property Setter", ps_name):
+			continue
+		frappe.get_doc({
+			"doctype": "Property Setter",
+			"doctype_or_field": "DocField",
+			"doc_type": "Purchase Invoice",
+			"field_name": field_name,
+			"property": "read_only",
+			"value": "0",
+			"property_type": "Check",
+			"is_system_generated": 0,
+			"name": ps_name,
+		}).insert(ignore_permissions=True)
+		frappe.db.commit()
+
+
 def after_install():
 	"""Create custom fields after app installation"""
 	create_custom_fields(PDC_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(CBE_LINK_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(get_sales_partner_commission_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()
@@ -50,6 +89,7 @@ def after_migrate():
 	create_custom_fields(PDC_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(CBE_LINK_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(get_sales_partner_commission_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()

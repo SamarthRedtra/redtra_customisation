@@ -6,68 +6,52 @@ from erpnext.accounts.doctype.purchase_invoice.purchase_invoice import PurchaseI
 from erpnext.assets.doctype.asset.asset import is_cwip_accounting_enabled
 from erpnext.assets.doctype.asset_category.asset_category import get_asset_category_account
 from frappe import _, throw
-from frappe.utils import cint, flt, get_link_to_form
+from frappe.utils import flt, get_link_to_form
 
 from redtra_customisation.override.purchase_invoice_expense_account import (
 	is_any_account_allowed_on_pi,
 )
-from redtra_customisation.override.purchase_invoice_point_adjustment import (
-	apply_point_adjustments,
-	sync_point_adjustment_rows,
-)
-from redtra_customisation.override.purchase_invoice_point_adjustment_gl import (
-	build_point_adjustment_gl_entries,
-)
-from redtra_customisation.override.purchase_invoice_point_adjustment_settings import (
-	get_pi_point_adjustment_account,
-	is_pi_point_adjustment_gl_split_enabled,
+from redtra_customisation.override.purchase_invoice_rounding import (
+	apply_round_off_account_override,
+	has_manual_rounding,
+	preserve_manual_rounding,
 )
 
 
 class CustomPurchaseInvoice(PurchaseInvoice):
-	def calculate_taxes_and_totals(self):
-		super().calculate_taxes_and_totals()
-		if self.get("point_adjustments"):
-			sync_point_adjustment_rows(self)
-			apply_point_adjustments(self)
+	def is_rounded_total_disabled(self):
+		if has_manual_rounding(self):
+			return False
+		return super().is_rounded_total_disabled()
 
-	def validate_point_adjustments(self):
-		if not self.get("point_adjustments"):
+	def calculate_taxes_and_totals(self):
+		manual_rounding = flt(self.rounding_adjustment) if flt(self.rounding_adjustment) else None
+		manual_rounded = (
+			flt(self.rounded_total)
+			if flt(self.rounded_total)
+			and abs(flt(self.rounded_total) - flt(self.grand_total)) > 0.0001
+			else None
+		)
+		had_manual = manual_rounding is not None or manual_rounded is not None
+
+		super().calculate_taxes_and_totals()
+
+		if not had_manual:
 			return
 
-		item_by_idx = {cint(row.idx): row for row in self.get("items") or []}
-		for adj in self.get("point_adjustments"):
-			if not item_by_idx.get(cint(adj.item_row)):
-				frappe.throw(
-					_("Point Adjustment row {0}: Item Row #{1} does not exist.").format(
-						adj.idx, adj.item_row
-					)
-				)
-			if not flt(adj.adjustment_amount):
-				frappe.throw(
-					_("Point Adjustment row {0}: Adjustment Amount is required.").format(adj.idx)
-				)
+		if manual_rounding is not None:
+			self.rounding_adjustment = manual_rounding
+		elif manual_rounded is not None:
+			self.rounded_total = manual_rounded
+
+		preserve_manual_rounding(self)
 
 	def validate(self):
-		self.validate_point_adjustments()
-		self.validate_point_adjustment_gl_split()
 		super().validate()
-
-	def validate_point_adjustment_gl_split(self):
-		if not self.get("point_adjustments"):
-			return
-
-		if is_pi_point_adjustment_gl_split_enabled() and not get_pi_point_adjustment_account():
-			frappe.throw(
-				_("Set Purchase Invoice Point Adjustment Account in Redtra Custom Setting")
-			)
 
 	def get_gl_entries(self, inventory_account_map=None):
 		gl_entries = super().get_gl_entries(inventory_account_map)
-		if not is_pi_point_adjustment_gl_split_enabled() or not self.get("point_adjustments"):
-			return gl_entries
-
-		return gl_entries + build_point_adjustment_gl_entries(self)
+		return apply_round_off_account_override(self, gl_entries)
 
 	def set_expense_account(self, for_validate=False):
 		if not is_any_account_allowed_on_pi():
