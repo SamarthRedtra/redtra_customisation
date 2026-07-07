@@ -3,12 +3,13 @@ Payment Entry Override for PDC Management
 """
 
 import frappe
-from erpnext.accounts.doctype.payment_entry.payment_entry import PaymentEntry
 from frappe import _
 from frappe.utils import flt, getdate, nowdate
 
+from hrms.overrides.employee_payment_entry import EmployeePaymentEntry
 
-class CustomPaymentEntry(PaymentEntry):
+
+class CustomPaymentEntry(EmployeePaymentEntry):
 	"""
 	Extended Payment Entry class with PDC management functionality
 	"""

@@ -3,7 +3,7 @@
 
 import frappe
 from frappe.query_builder.functions import Count
-from frappe.utils import flt
+from frappe.utils import cint, date_diff, flt, getdate
 
 from hrms.payroll.doctype.salary_slip.salary_slip import (
 	SalarySlip,
@@ -17,8 +17,51 @@ from redtra_customisation.rpayroll.overtime_helpers import (
 )
 from frappe.utils import cint
 
-
 class SalarySlipOvertime(SalarySlip):
+	def get_working_days_details(self, lwp=None, for_preview=0):
+		super().get_working_days_details(lwp=lwp, for_preview=for_preview)
+		if not for_preview:
+			self._set_monthly_payment_days_denominator()
+
+	def _set_monthly_payment_days_denominator(self):
+		"""Keep payment_days from attendance but prorate against the normal monthly cycle.
+
+		Partial joiner/relieving slips can be shorter than the usual payroll period
+		(e.g. 26th-25th). Using the shortened period as total_working_days inflates
+		per-day pay. Use the employee's standard cycle length instead.
+		"""
+		if not self.start_date or not self.end_date or not self.salary_structure:
+			return
+
+		frequency = frappe.db.get_value("Salary Structure", self.salary_structure, "payroll_frequency")
+		if frequency != "Monthly":
+			return
+
+		period_days = date_diff(self.end_date, self.start_date) + 1
+		if not period_days:
+			return
+
+		filters = {
+			"employee": self.employee,
+			"docstatus": ("!=", 2),
+			"end_date": ("<", self.start_date),
+		}
+		if self.name:
+			filters["name"] = ("!=", self.name)
+
+		standard_cycle_days = frappe.db.get_value(
+			"Salary Slip",
+			filters,
+			"total_working_days",
+			order_by="end_date desc",
+		)
+		if not standard_cycle_days or flt(standard_cycle_days) <= period_days:
+			return
+
+		is_partial_joiner = self.joining_date and getdate(self.joining_date) > getdate(self.start_date)
+		if self.relieving_date or is_partial_joiner:
+			self.total_working_days = standard_cycle_days
+
 	@frappe.whitelist()
 	def get_emp_and_working_day_details(self):
 		if self.employee and self.start_date and self.end_date:
