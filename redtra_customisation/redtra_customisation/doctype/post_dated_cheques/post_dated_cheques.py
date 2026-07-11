@@ -560,7 +560,7 @@ def get_invoice_pdc_connections(reference_doctype, reference_name):
 		return []
 
 	rows = frappe.db.sql(
-		"""
+		f"""
 		SELECT
 			pdc.name,
 			pdc.status,
@@ -569,9 +569,21 @@ def get_invoice_pdc_connections(reference_doctype, reference_name):
 			pdc.amount,
 			pdc.payment_entry,
 			ref.allocated_amount,
+			CASE
+				WHEN IFNULL(pdc_totals.total_alloc, 0) > IFNULL(pdc.amount, 0)
+					AND IFNULL(pdc_totals.total_alloc, 0) > 0
+					AND IFNULL(pdc.amount, 0) > 0
+				THEN ref.allocated_amount * pdc.amount / pdc_totals.total_alloc
+				ELSE ref.allocated_amount
+			END AS effective_allocated_amount,
 			pe.pdc_cheque_status AS payment_entry_status
 		FROM `tabPDC Invoice Reference` ref
 		INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
+		LEFT JOIN (
+			SELECT parent, SUM(allocated_amount) AS total_alloc
+			FROM `tabPDC Invoice Reference`
+			GROUP BY parent
+		) pdc_totals ON pdc_totals.parent = pdc.name
 		LEFT JOIN `tabPayment Entry` pe
 			ON pe.name = pdc.payment_entry AND pe.docstatus = 1
 		WHERE ref.reference_doctype = %(reference_doctype)s
@@ -591,6 +603,7 @@ def get_invoice_pdc_connections(reference_doctype, reference_name):
 
 	for row in rows:
 		row["display_status"] = _get_pdc_display_status(row.status, row.payment_entry_status)
+		row["display_amount"] = flt(row.effective_allocated_amount)
 
 	return rows
 

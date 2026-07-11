@@ -64,7 +64,10 @@
 						const cheque_date = pdc.reference_date
 							? frappe.datetime.str_to_user(pdc.reference_date)
 							: "—";
-						const allocated = format_currency(pdc.allocated_amount || 0, currency);
+						const allocated = format_currency(
+							pdc.display_amount ?? pdc.effective_allocated_amount ?? pdc.allocated_amount ?? 0,
+							currency
+						);
 						const status_badge = get_status_badge(
 							pdc.display_status,
 							pdc.status,
@@ -91,7 +94,7 @@
 									<th>${__("PDC")}</th>
 									<th>${__("Cheque No")}</th>
 									<th>${__("Cheque Date")}</th>
-									<th class="text-right">${__("Allocated")}</th>
+									<th class="text-right">${__("PDC Allocation")}</th>
 									<th>${__("Status")}</th>
 								</tr>
 							</thead>

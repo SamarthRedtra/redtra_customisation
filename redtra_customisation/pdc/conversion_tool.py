@@ -7,7 +7,12 @@ import frappe
 from frappe import _
 from frappe.utils import flt, nowdate
 
+from erpnext.accounts.doctype.payment_entry.payment_entry import get_account_details
 from erpnext.accounts.party import get_party_account, get_party_account_currency
+
+from redtra_customisation.redtra_customisation.doctype.post_dated_cheques.post_dated_cheques import (
+	_effective_pdc_line_allocation,
+)
 
 
 def _coerce_json_arg(value, arg_name: str, expected_type: type):
@@ -153,6 +158,21 @@ def convert_post_dated_cheques(rows: list[dict], defaults: dict | None = None) -
 			pe.insert()
 
 			if auto_submit:
+				pe.reload()
+				if flt(pe.difference_amount):
+					total_allocated = sum(
+						flt(ref.allocated_amount) for ref in pdc.get("invoice_references") or []
+					)
+					frappe.throw(
+						_(
+							"PDC {0}: Payment Entry difference amount is {1}. Cheque amount is {2} and total invoice allocation is {3}. Please review invoice references."
+						).format(
+							pdc_name,
+							pe.difference_amount,
+							flt(pdc.amount),
+							total_allocated,
+						)
+					)
 				pe.submit()
 
 			pdc.db_set("payment_entry", pe.name, update_modified=False)
@@ -222,25 +242,48 @@ def _make_payment_entry_from_pdc(pdc, bank_account: str | None, posting_date_ove
 		pe.paid_amount = flt(pdc.amount)
 		pe.received_amount = flt(pdc.amount)
 
-	# Currency
-	acc_currency = pdc.account_currency or get_party_account_currency(pdc.party_type, pdc.party, pdc.company)
-	if acc_currency:
-		pe.paid_from_account_currency = acc_currency
-		pe.paid_to_account_currency = acc_currency
-		# Keep a sane exchange rate if provided
-		if hasattr(pe, "source_exchange_rate") and flt(pdc.exchange_rate):
+	# Currency — set per account (bank vs party), matching ERPNext get_payment_entry
+	if pe.paid_from:
+		acc_from = get_account_details(pe.paid_from, pe.posting_date, pe.cost_center)
+		pe.paid_from_account_currency = acc_from.account_currency
+		pe.paid_from_account_type = acc_from.account_type
+	if pe.paid_to:
+		acc_to = get_account_details(pe.paid_to, pe.posting_date, pe.cost_center)
+		pe.paid_to_account_currency = acc_to.account_currency
+		pe.paid_to_account_type = acc_to.account_type
+
+	party_currency = pdc.account_currency or get_party_account_currency(
+		pdc.party_type, pdc.party, pdc.company
+	)
+	if party_currency and hasattr(pe, "source_exchange_rate"):
+		if pe.paid_from_account_currency == party_currency and flt(pdc.exchange_rate):
 			pe.source_exchange_rate = flt(pdc.exchange_rate)
-		if hasattr(pe, "target_exchange_rate") and flt(pdc.exchange_rate):
+	if party_currency and hasattr(pe, "target_exchange_rate"):
+		if pe.paid_to_account_currency == party_currency and flt(pdc.exchange_rate):
 			pe.target_exchange_rate = flt(pdc.exchange_rate)
 
-	# References (allocate invoices)
-	for ref in pdc.get("invoice_references") or []:
-		pe.append("references", {
-			"reference_doctype": ref.reference_doctype,
-			"reference_name": ref.reference_name,
-			"total_amount": ref.total_amount,
-			"outstanding_amount": ref.outstanding_amount,
-			"allocated_amount": ref.allocated_amount
-		})
+	# References — prorate allocations to cheque amount when rows exceed PDC amount
+	refs = pdc.get("invoice_references") or []
+	total_allocated = sum(flt(ref.allocated_amount) for ref in refs)
+	pdc_amount = flt(pdc.amount)
+
+	for ref in refs:
+		effective_alloc = _effective_pdc_line_allocation(
+			ref.allocated_amount,
+			pdc_amount,
+			total_allocated,
+		)
+		if not effective_alloc:
+			continue
+		pe.append(
+			"references",
+			{
+				"reference_doctype": ref.reference_doctype,
+				"reference_name": ref.reference_name,
+				"total_amount": ref.total_amount,
+				"outstanding_amount": ref.outstanding_amount,
+				"allocated_amount": effective_alloc,
+			},
+		)
 
 	return pe
