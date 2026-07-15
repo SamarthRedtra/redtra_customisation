@@ -223,23 +223,97 @@ class TestProvisionalPurchaseOrder(UnitTestCase):
 	def test_apply_po_item_updates_serializes_schedule_date(self):
 		from redtra_customisation.override.provisional_purchase_order import _apply_po_item_updates
 
-		with patch("erpnext.controllers.accounts_controller.update_child_qty_rate") as update_items:
-			_apply_po_item_updates(
-				"PO-TEST",
-				[
+		with patch(
+			"frappe.get_all",
+			return_value=[
+				frappe._dict(
 					{
-						"docname": "POI-001",
+						"name": "POI-001",
 						"item_code": "ITEM-1",
-						"qty": 3000,
+						"qty": 100,
 						"rate": 47,
-						"schedule_date": date(2026, 6, 23),
+						"uom": "Nos",
+						"schedule_date": "2026-01-01",
+						"description": "Test",
+						"conversion_factor": 1,
 					}
-				],
-			)
+				)
+			],
+		):
+			with patch("erpnext.controllers.accounts_controller.update_child_qty_rate") as update_items:
+				_apply_po_item_updates(
+					"PO-TEST",
+					[
+						{
+							"docname": "POI-001",
+							"item_code": "ITEM-1",
+							"qty": 3000,
+							"rate": 47,
+							"schedule_date": date(2026, 6, 23),
+						}
+					],
+				)
 
 		update_items.assert_called_once()
 		payload = update_items.call_args[0][1]
 		self.assertIn("2026-06-23", payload)
+
+	def test_apply_po_item_updates_keeps_unreceived_rows(self):
+		from redtra_customisation.override.provisional_purchase_order import _apply_po_item_updates
+
+		with patch(
+			"frappe.get_all",
+			return_value=[
+				frappe._dict(
+					{
+						"name": "POI-001",
+						"item_code": "ITEM-1",
+						"qty": 40,
+						"rate": 100,
+						"uom": "Nos",
+						"schedule_date": "2026-01-01",
+						"description": "Received item",
+						"conversion_factor": 1,
+					}
+				),
+				frappe._dict(
+					{
+						"name": "POI-002",
+						"item_code": "ITEM-2",
+						"qty": 20,
+						"rate": 50,
+						"uom": "Nos",
+						"schedule_date": "2026-01-01",
+						"description": "Pending item",
+						"conversion_factor": 1,
+					}
+				),
+			],
+		):
+			with patch("erpnext.controllers.accounts_controller.update_child_qty_rate") as update_items:
+				_apply_po_item_updates(
+					"PO-TEST",
+					[
+						{
+							"docname": "POI-001",
+							"item_code": "ITEM-1",
+							"qty": 90,
+							"rate": 100,
+							"uom": "Nos",
+							"schedule_date": "2026-01-01",
+							"description": "Received item",
+							"conversion_factor": 1,
+						}
+					],
+				)
+
+		update_items.assert_called_once()
+		payload = frappe.parse_json(update_items.call_args[0][1])
+		self.assertEqual(len(payload), 2)
+		self.assertEqual(payload[0]["docname"], "POI-001")
+		self.assertEqual(payload[0]["qty"], 90)
+		self.assertEqual(payload[1]["docname"], "POI-002")
+		self.assertEqual(payload[1]["qty"], 20)
 
 	def test_make_provisional_purchase_receipt_delegates_for_standard_po(self):
 		from redtra_customisation.override.provisional_purchase_order import make_provisional_purchase_receipt

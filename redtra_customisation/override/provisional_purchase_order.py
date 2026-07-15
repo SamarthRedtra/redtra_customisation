@@ -163,11 +163,51 @@ def _serialize_schedule_date(value):
 
 
 def _apply_po_item_updates(po_name: str, trans_items: list[dict]):
+	"""Apply qty/rate updates without dropping untouched PO rows."""
 	from erpnext.controllers.accounts_controller import update_child_qty_rate
+
+	updates_by_docname = {item["docname"]: item for item in trans_items if item.get("docname")}
+	if not updates_by_docname:
+		return
+
+	all_po_items = frappe.get_all(
+		"Purchase Order Item",
+		filters={"parent": po_name},
+		fields=[
+			"name",
+			"item_code",
+			"qty",
+			"rate",
+			"uom",
+			"schedule_date",
+			"description",
+			"conversion_factor",
+		],
+	)
+
+	full_trans_items = []
+	for po_item in all_po_items:
+		update = updates_by_docname.get(po_item.name)
+		if update:
+			full_trans_items.append(update)
+			continue
+
+		full_trans_items.append(
+			{
+				"docname": po_item.name,
+				"item_code": po_item.item_code,
+				"qty": po_item.qty,
+				"rate": po_item.rate,
+				"uom": po_item.uom,
+				"schedule_date": _serialize_schedule_date(po_item.schedule_date),
+				"description": po_item.description,
+				"conversion_factor": po_item.conversion_factor,
+			}
+		)
 
 	frappe.flags.in_provisional_po_sync = True
 	try:
-		update_child_qty_rate("Purchase Order", frappe.as_json(trans_items), po_name, "items")
+		update_child_qty_rate("Purchase Order", frappe.as_json(full_trans_items), po_name, "items")
 	finally:
 		frappe.flags.in_provisional_po_sync = False
 
