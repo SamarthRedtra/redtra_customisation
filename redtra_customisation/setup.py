@@ -195,5 +195,14 @@ def get_sales_partner_commission_custom_fields():
 				"read_only": 1,
 				"insert_after": "custom_sales_partner_commission_percentage",
 			},
+			{
+				"default": "0",
+				"fieldname": "custom_commission_recorded",
+				"fieldtype": "Check",
+				"label": "Commission Recorded on Payment",
+				"read_only": 1,
+				"hidden": 1,
+				"insert_after": "custom_sales_partner_commission_amount",
+			},
 		],
 	}

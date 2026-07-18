@@ -213,7 +213,12 @@ doc_events = {
     "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
  },
 	"Sales Invoice": {
-		"validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
+		"validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission",
+		"on_update": "redtra_customisation.paid_invoice_commission.maybe_record_or_clear_paid_commission",
+	},
+	"Payment Entry": {
+		"on_submit": "redtra_customisation.paid_invoice_commission.sync_commission_from_payment_entry",
+		"on_cancel": "redtra_customisation.paid_invoice_commission.sync_commission_from_payment_entry",
 	},
 	"Sales Person": {
 		"validate": "redtra_customisation.redtra_customisation.custom.sales_person.validate_slabs"

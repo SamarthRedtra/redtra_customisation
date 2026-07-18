@@ -11,7 +11,10 @@ from redtra_customisation.purchase_invoice.custom_fields import (
 	PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS,
 	PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS,
 )
-from redtra_customisation.setup import get_sales_partner_commission_custom_fields, get_work_order_custom_fields
+from redtra_customisation.setup import (
+	get_sales_partner_commission_custom_fields,
+	get_work_order_custom_fields,
+)
 
 
 def create_property_setters():

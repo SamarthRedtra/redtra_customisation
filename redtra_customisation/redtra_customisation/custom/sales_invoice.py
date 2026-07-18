@@ -4,7 +4,10 @@ from redtra_customisation.commission import (
 	apply_sales_partner_commission_from_team,
 	_set_sales_partner_commission_fields,
 	get_project_commission_rate,
+	get_sales_invoice_commission_base_amount,
+	is_sales_invoice_from_sales_order,
 )
+from redtra_customisation.paid_invoice_commission import should_defer_commission_to_payment
 
 # Module-level caches (per-request, cleared on bench restart)
 _NON_STOCK_ITEMS_CACHE = None
@@ -21,6 +24,9 @@ def calculate_profit_and_commission(doc, method):
 	# manually edited commission_rate / incentives values are preserved
 	# when updating after submit.
 	if doc.docstatus == 1:
+		return
+	# Project-wise commission is recorded when the invoice is fully paid.
+	if should_defer_commission_to_payment(doc):
 		return
 	calculate_commission(doc)
 
@@ -322,26 +328,6 @@ class _DocGrossProfitGenerator:
 		self.si_list = new_list
 
 
-def _is_sales_invoice_from_sales_order(doc):
-	return any(row.get("sales_order") for row in (doc.get("items") or []))
-
-
-def _get_commission_base_amount(doc, row=None, force_net_total=False, force_total=False):
-	if force_total:
-		total_amount = flt(doc.get("base_total"))
-		if row and flt(row.get("allocated_percentage")) > 0:
-			return total_amount * (flt(row.get("allocated_percentage")) / 100.0)
-		return total_amount
-
-	if row and flt(row.get("allocated_amount")) > 0:
-		return flt(row.get("allocated_amount"))
-
-	if force_net_total:
-		return flt(doc.get("base_net_total"))
-
-	return flt(doc.get("amount_eligible_for_commission") or doc.get("base_net_total"))
-
-
 def _normalize_commission_doc(doc):
 	as_dict_method = getattr(doc, "as_dict", None)
 	if callable(as_dict_method):
@@ -373,7 +359,9 @@ def _build_commission_preview(doc, settings=None):
 		project_commission_rate = get_project_commission_rate(
 			doc.get("project"), settings=settings
 		)
-	use_total_for_commission = project_commission_rate is not None and _is_sales_invoice_from_sales_order(doc)
+	use_total_for_commission = (
+		project_commission_rate is not None and is_sales_invoice_from_sales_order(doc)
+	)
 	use_net_total_for_commission = project_commission_rate is not None and not use_total_for_commission
 
 	sales_person_cache = {}
@@ -402,7 +390,7 @@ def _build_commission_preview(doc, settings=None):
 							commission_rate = flt(slab.get("value"))
 							break
 
-		base_amount = _get_commission_base_amount(
+		base_amount = get_sales_invoice_commission_base_amount(
 			doc,
 			row,
 			force_net_total=use_net_total_for_commission,
@@ -423,7 +411,7 @@ def _build_commission_preview(doc, settings=None):
 	elif is_sales_based:
 		header_commission_rate = customer_commission
 
-	amount_eligible_for_commission = _get_commission_base_amount(
+	amount_eligible_for_commission = get_sales_invoice_commission_base_amount(
 		doc,
 		force_net_total=use_net_total_for_commission,
 		force_total=use_total_for_commission,

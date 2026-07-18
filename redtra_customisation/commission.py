@@ -203,3 +203,25 @@ def get_commission_rate(slabs, project_value):
 		return flt(slab.commission_percentage)
 
 	return None
+
+
+def is_sales_invoice_from_sales_order(doc):
+	return any(row.get("sales_order") for row in (doc.get("items") or []))
+
+
+def get_sales_invoice_commission_base_amount(
+	doc, row=None, force_net_total=False, force_total=False
+):
+	if force_total:
+		total_amount = flt(doc.get("base_total"))
+		if row and flt(row.get("allocated_percentage")) > 0:
+			return total_amount * (flt(row.get("allocated_percentage")) / 100.0)
+		return total_amount
+
+	if row and flt(row.get("allocated_amount")) > 0:
+		return flt(row.get("allocated_amount"))
+
+	if force_net_total:
+		return flt(doc.get("base_net_total"))
+
+	return flt(doc.get("amount_eligible_for_commission") or doc.get("base_net_total"))
