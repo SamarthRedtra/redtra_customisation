@@ -1,14 +1,14 @@
 [project]
 name = "redtra_customisation"
 authors = [
-    { name = "samarth.upare@redtra.com", email = "samarth.upare@redtra.com"}
+    { name = "samarth.upare@redtra.com", email = "samarth.upare@redtra.com" }
 ]
-description = "Redtra Customisation "
+description = "Redtra Customisation"
 requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
-    # "frappe~=15.0.0" # Installed and managed by bench.
+    # "frappe~=16.0.0" # Installed and managed by bench.
 ]
 
 [build-system]
@@ -17,6 +17,6 @@ build-backend = "flit_core.buildapi"
 
 # These dependencies are only installed when developer mode is enabled
 [tool.bench.dev-dependencies]
-#jj
+
 [tool.bench.frappe-dependencies]
-frappe = ">=16.0.0-dev,<17.0.0-dev"
+frappe = ">=16.0.0-dev <17.0.0"
