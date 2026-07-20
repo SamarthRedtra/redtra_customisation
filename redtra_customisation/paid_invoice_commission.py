@@ -387,7 +387,7 @@ def clear_paid_invoice_commission(si_name: str) -> bool:
 
 def maybe_record_or_clear_paid_commission(doc, method=None):
 	"""Sales Invoice on_update hook."""
-	if getattr(doc, "doctype", None) != "Sales Invoice":
+	if getattr(doc, "doctype", None) != "Sales Invoice" or doc.docstatus != 1:
 		return
 	_sync_si_commission(doc.name)
 
@@ -398,6 +398,12 @@ def maybe_record_or_clear_paid_commission_by_name(si_name: str):
 
 def _sync_si_commission(si_name: str):
 	if not si_name or not frappe.db.exists("Sales Invoice", si_name):
+		return
+	if not frappe.db.has_column("Sales Invoice", "custom_commission_recorded"):
+		# Do not block invoice saves on a site that has not yet run the field migration.
+		frappe.logger("paid_invoice_commission").warning(
+			"Skipping paid-invoice commission sync because Sales Invoice.custom_commission_recorded is missing"
+		)
 		return
 
 	si = frappe.db.get_value(
