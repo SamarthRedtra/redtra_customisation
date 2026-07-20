@@ -52,8 +52,9 @@ class PostDatedCheques(Document):
 		self.status = "Pending"
 
 	def set_invoice_links(self):
-		"""Store linked invoice IDs on the parent so they are visible/searchable in list view."""
+		"""Store linked invoice IDs and supplier/customer references on the parent."""
 		references = []
+		reference_numbers = []
 		seen = set()
 		for row in self.get("invoice_references") or []:
 			if not row.reference_doctype or not row.reference_name:
@@ -63,7 +64,14 @@ class PostDatedCheques(Document):
 				continue
 			seen.add(key)
 			references.append(row.reference_name)
+			invoice_reference_no = _get_invoice_reference_no(
+				row.reference_doctype, row.reference_name
+			)
+			row.invoice_reference_no = invoice_reference_no
+			if invoice_reference_no:
+				reference_numbers.append(invoice_reference_no)
 		self.invoice_links = ", ".join(references)
+		self.invoice_reference_numbers = ", ".join(reference_numbers)
 		summary = references[:3]
 		if len(references) > 3:
 			summary.append(_("+{0} more").format(len(references) - 3))
@@ -161,6 +169,22 @@ class PostDatedCheques(Document):
 		)
 		linked.update(rows or [])
 		return list(linked)
+
+
+def _get_invoice_reference_no(reference_doctype, reference_name):
+	"""Return the external invoice number stored on the linked sales/purchase invoice."""
+	if not reference_name or reference_doctype not in ("Sales Invoice", "Purchase Invoice"):
+		return ""
+
+	if reference_doctype == "Purchase Invoice":
+		fieldname = "custom_supplier_invoice_no"
+	else:
+		# Sales invoices retain the customer invoice/reference number in Bill No.
+		fieldname = "bill_no"
+
+	if not frappe.db.has_column(reference_doctype, fieldname):
+		return ""
+	return frappe.db.get_value(reference_doctype, reference_name, fieldname) or ""
 
 
 def get_existing_pdc_for_invoice(reference_doctype, reference_name, exclude_pdc=None):
@@ -621,4 +645,3 @@ def _get_pdc_display_status(pdc_status, payment_entry_status=None):
 		return _(status)
 
 	return _("Pending")
-

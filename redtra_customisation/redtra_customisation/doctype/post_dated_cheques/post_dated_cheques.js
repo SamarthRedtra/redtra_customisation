@@ -271,6 +271,7 @@ frappe.ui.form.on("Post Dated Cheques", {
 									selected_rows.push({
 										reference_doctype: target_doctype,
 										reference_name: inv_name,
+										invoice_reference_no: $row.data("invoice-reference-no") || "",
 										total_amount: grand_total,
 										outstanding_amount: outstanding,
 										allocated_amount: allocated
@@ -296,6 +297,7 @@ frappe.ui.form.on("Post Dated Cheques", {
 								const row = frm.add_child("invoice_references");
 								row.reference_doctype = item.reference_doctype;
 								row.reference_name = item.reference_name;
+								row.invoice_reference_no = item.invoice_reference_no;
 								row.total_amount = item.total_amount;
 								row.outstanding_amount = item.outstanding_amount;
 								row.allocated_amount = item.allocated_amount;
@@ -327,7 +329,7 @@ frappe.ui.form.on("Post Dated Cheques", {
 
 				invoices.forEach(inv => {
 					html += `
-						<tr class="invoice-row" data-name="${inv.name}" data-grand-total="${inv.grand_total}" data-outstanding="${inv.outstanding_amount}" data-remaining="${inv.remaining_allocatable}">
+						<tr class="invoice-row" data-name="${inv.name}" data-invoice-reference-no="${frappe.utils.escape_html(is_purchase ? (inv.custom_supplier_invoice_no || '') : (inv.custom_customer_invoice_no || ''))}" data-grand-total="${inv.grand_total}" data-outstanding="${inv.outstanding_amount}" data-remaining="${inv.remaining_allocatable}">
 							<td style="text-align: center; vertical-align: middle;">
 								<input type="checkbox" class="invoice-check">
 							</td>
@@ -466,6 +468,12 @@ frappe.ui.form.on("PDC Invoice Reference", {
 					frappe.model.set_value(cdt, cdn, "allocated_amount", r.outstanding_amount);
 					calculate_total_amount(frm);
 				}
+			});
+			const fieldname = row.reference_doctype === "Purchase Invoice"
+				? "custom_supplier_invoice_no"
+				: "bill_no";
+			frappe.db.get_value(row.reference_doctype, row.reference_name, fieldname).then((r) => {
+				frappe.model.set_value(cdt, cdn, "invoice_reference_no", (r.message || {})[fieldname] || "");
 			});
 		}
 	}

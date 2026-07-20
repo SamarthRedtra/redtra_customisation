@@ -31,6 +31,7 @@
   "section_break_amount",
   "invoice_references",
   "invoice_links",
+  "invoice_reference_numbers",
   "invoice_links_html",
   "invoice_links_list",
   "column_break_references",
@@ -189,6 +190,15 @@
    "label": "Invoices",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+	"allow_on_submit": 1,
+	"fieldname": "invoice_reference_numbers",
+	"fieldtype": "Small Text",
+	"in_list_view": 1,
+	"label": "Invoice Reference Numbers",
+	"no_copy": 1,
+	"read_only": 1
   },
   {
    "fieldname": "invoice_links_html",
