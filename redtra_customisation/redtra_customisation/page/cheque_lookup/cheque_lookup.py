@@ -19,7 +19,9 @@ def get_cheque_details(cheque_no: str) -> dict:
 
 def _pdc_details(name: str) -> dict:
 	pdc = frappe.get_doc("Post Dated Cheques", name)
-	invoices = [_invoice(row) for row in pdc.get("invoice_references") or []]
+	payment = _payment(pdc.payment_entry)
+	pdc_invoices = [_invoice(row) for row in pdc.get("invoice_references") or []]
+	invoices = _merge_invoices(pdc_invoices, (payment or {}).pop("invoices", []))
 	projects = _unique_projects(
 		[pdc.project] + [project for invoice in invoices for project in invoice.get("projects", [])]
 	)
@@ -31,7 +33,7 @@ def _pdc_details(name: str) -> dict:
 		"reference_no": pdc.reference_no, "reference_date": pdc.reference_date,
 		"posting_date": pdc.posting_date, "amount": pdc.amount, "currency": pdc.account_currency,
 		"bank_account": pdc.bank_account, "notes": pdc.notes,
-		"payment_entry": _payment(pdc.payment_entry),
+		"payment_entry": payment,
 		"invoices": invoices,
 	}
 
@@ -41,19 +43,51 @@ def _payment(name: str | None) -> dict | None:
 		return None
 	if not frappe.has_permission("Payment Entry", "read", doc=name):
 		return {"name": name, "has_access": False}
-	fields = ["name", "status", "posting_date", "mode_of_payment", "received_amount", "paid_amount"]
+	fields = [
+		"name",
+		"status",
+		"posting_date",
+		"reference_no",
+		"reference_date",
+		"mode_of_payment",
+		"party_type",
+		"party",
+		"paid_from",
+		"paid_to",
+		"received_amount",
+		"paid_amount",
+	]
 	row = frappe.db.get_value("Payment Entry", name, fields, as_dict=True)
 	if row:
 		row.has_access = True
+		row["invoices"] = [
+			_invoice(reference)
+			for reference in frappe.get_all(
+				"Payment Entry Reference",
+				filters={"parent": name, "parenttype": "Payment Entry"},
+				fields=[
+					"reference_doctype",
+					"reference_name",
+					"bill_no",
+					"custom_supplier_invoice_no",
+					"allocated_amount",
+					"total_amount",
+					"outstanding_amount",
+				],
+				order_by="idx asc",
+			)
+		]
 	return row
 
 
 def _invoice(reference) -> dict:
-	doctype, name = reference.reference_doctype, reference.reference_name
+	doctype, name = reference.get("reference_doctype"), reference.get("reference_name")
 	row = {
-		"doctype": doctype, "name": name, "invoice_reference_no": reference.invoice_reference_no,
-		"allocated_amount": reference.allocated_amount, "total_amount": reference.total_amount,
-		"pdc_outstanding_amount": reference.outstanding_amount, "has_access": False,
+		"doctype": doctype, "name": name,
+		"invoice_reference_no": reference.get("invoice_reference_no") or reference.get("bill_no")
+		or reference.get("custom_supplier_invoice_no"),
+		"allocated_amount": reference.get("allocated_amount"), "total_amount": reference.get("total_amount"),
+		"pdc_outstanding_amount": reference.get("outstanding_amount"), "has_access": False,
 	}
 	if doctype not in ("Sales Invoice", "Purchase Invoice") or not name:
 		return row
@@ -92,3 +126,22 @@ def _invoice(reference) -> dict:
 def _unique_projects(projects: list[str | None]) -> list[str]:
 	"""Keep project links ordered and unique, ignoring blank values."""
 	return list(dict.fromkeys(project for project in projects if project))
+
+
+def _merge_invoices(*invoice_groups: list[dict]) -> list[dict]:
+	"""Combine PDC and Payment Entry references, keeping one row per invoice."""
+	merged = {}
+	for invoices in invoice_groups:
+		for invoice in invoices:
+			key = (invoice.get("doctype"), invoice.get("name"))
+			if not all(key):
+				continue
+			if key in merged:
+				# Payment Entry references may have the latest allocation while PDC
+				# references contain the external invoice reference.
+				for field, value in invoice.items():
+					if value not in (None, "", [], 0):
+						merged[key][field] = value
+			else:
+				merged[key] = invoice
+	return list(merged.values())
