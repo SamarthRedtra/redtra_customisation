@@ -176,8 +176,24 @@ def get_entries(filters):
 	for entry in entries:
 		entry.source_doctype = filters["doc_type"]
 		entry.create_payment_entry = ""
+		entry.commission_paid = 0
+		if filters["doc_type"] == "Sales Invoice" and entry.get("source_name") and entry.get("project"):
+			entry.commission_paid = 1 if _is_sales_invoice_commission_paid(
+				entry.source_name, entry.project
+			) else 0
 
 	return entries
+
+
+def _is_sales_invoice_commission_paid(invoice_no: str, project: str) -> bool:
+	try:
+		from construction_management.api.project_commission_data import (
+			_get_paid_out_commission_invoices,
+		)
+
+		return invoice_no in _get_paid_out_commission_invoices(project)
+	except ImportError:
+		return False
 
 
 def get_journal_entries(filters):
@@ -236,7 +252,10 @@ def get_journal_entries(filters):
 		as_dict=True,
 	)
 
+	filtered = []
 	for row in rows:
+		if _is_commission_accrual_voucher(row.source_name, row.get("user_remark")):
+			continue
 		row.source_doctype = "Journal Entry"
 		row.customer = None
 		row.territory = None
@@ -251,8 +270,21 @@ def get_journal_entries(filters):
 			else None
 		)
 		row.create_payment_entry = ""
+		filtered.append(row)
 
-	return rows
+	return filtered
+
+
+def _is_commission_accrual_voucher(voucher_no, user_remark=None) -> bool:
+	remark = user_remark or ""
+	if str(remark).startswith("Sales Commission Accrual for Sales Invoice "):
+		return True
+	try:
+		from construction_management.api.sales_commission_gl import is_commission_accrual_journal
+
+		return is_commission_accrual_journal(voucher_no)
+	except ImportError:
+		return False
 
 
 def _get_commission_accounts(company):

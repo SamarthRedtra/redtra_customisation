@@ -40,6 +40,7 @@ function ensure_redtra_commission_pe_button_styles() {
 
 function get_sales_person_payment_entry_route_options(row) {
 	const commission_amount = flt(row.commission_amount || 0);
+	const source_name = row.source_name || "";
 	const route_options = {
 		payment_type: "Pay",
 		party_type: "Employee",
@@ -47,7 +48,10 @@ function get_sales_person_payment_entry_route_options(row) {
 		company: row.company,
 		paid_amount: commission_amount,
 		received_amount: commission_amount,
-		remarks: `Commission payout for ${row.source_doctype || "Document"} ${row.source_name}`,
+		remarks: `Commission payout for Sales Invoice ${source_name}`,
+		custom_remarks: 1,
+		custom_is_commission_payout: 1,
+		reference_no: source_name,
 	};
 
 	if (row.project) {
@@ -143,6 +147,10 @@ frappe.query_reports["Sales Person Commission Payment Summary"] = {
 
 			if (!flt(data.commission_amount)) {
 				return `<span class="text-muted">${__("No Commission")}</span>`;
+			}
+
+			if (cint(data.commission_paid)) {
+				return `<span class="text-muted">${__("Paid")}</span>`;
 			}
 
 			const payload = encodeURIComponent(

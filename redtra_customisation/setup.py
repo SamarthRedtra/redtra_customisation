@@ -204,5 +204,26 @@ def get_sales_partner_commission_custom_fields():
 				"hidden": 1,
 				"insert_after": "custom_sales_partner_commission_amount",
 			},
+			{
+				"fieldname": "custom_commission_accrual_jv",
+				"fieldtype": "Link",
+				"options": "Journal Entry",
+				"label": "Commission Accrual Journal Entry",
+				"read_only": 1,
+				"hidden": 1,
+				"insert_after": "custom_commission_recorded",
+				"no_copy": 1,
+			},
+		],
+		"Payment Entry": [
+			{
+				"default": "0",
+				"fieldname": "custom_is_commission_payout",
+				"fieldtype": "Check",
+				"label": "Is Commission Payout",
+				"hidden": 1,
+				"insert_after": "remarks",
+				"no_copy": 1,
+			},
 		],
 	}

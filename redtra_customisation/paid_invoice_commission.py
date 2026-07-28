@@ -372,7 +372,32 @@ def record_paid_invoice_commission(si_name: str, force: bool = False) -> bool:
 
 	_write_sales_team(si_name, sales_person, rate, incentives, amount_eligible)
 	_write_header_commission(si_name, preview)
+	_book_commission_accrual_gl(si_name, incentives, si.project)
 	return True
+
+
+def _book_commission_accrual_gl(si_name: str, incentives: float, project: str | None):
+	"""Create Dr Commission / Cr Payable JV for sales-person incentives."""
+	try:
+		from construction_management.api.sales_commission_gl import (
+			create_or_update_commission_accrual_jv,
+		)
+	except ImportError:
+		return
+
+	create_or_update_commission_accrual_jv(
+		si_name=si_name,
+		amount=flt(incentives),
+		project=project,
+	)
+
+
+def _clear_commission_accrual_gl(si_name: str):
+	try:
+		from construction_management.api.sales_commission_gl import cancel_commission_accrual_jv
+	except ImportError:
+		return
+	cancel_commission_accrual_jv(si_name)
 
 
 def clear_paid_invoice_commission(si_name: str) -> bool:
@@ -380,6 +405,7 @@ def clear_paid_invoice_commission(si_name: str) -> bool:
 	if not frappe.db.get_value("Sales Invoice", si_name, "custom_commission_recorded"):
 		return False
 
+	_clear_commission_accrual_gl(si_name)
 	_clear_sales_team_commission(si_name)
 	_clear_header_commission(si_name)
 	return True
