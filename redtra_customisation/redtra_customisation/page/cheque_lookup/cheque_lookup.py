@@ -19,15 +19,20 @@ def get_cheque_details(cheque_no: str) -> dict:
 
 def _pdc_details(name: str) -> dict:
 	pdc = frappe.get_doc("Post Dated Cheques", name)
+	invoices = [_invoice(row) for row in pdc.get("invoice_references") or []]
+	projects = _unique_projects(
+		[pdc.project] + [project for invoice in invoices for project in invoice.get("projects", [])]
+	)
 	return {
-		"name": pdc.name, "status": pdc.status, "company": pdc.company, "project": pdc.project,
+		"name": pdc.name, "status": pdc.status, "company": pdc.company,
+		"project": pdc.project or (projects[0] if len(projects) == 1 else None), "projects": projects,
 		"party_type": pdc.party_type, "party": pdc.party, "party_name": pdc.party_name,
 		"payment_type": pdc.payment_type, "mode_of_payment": pdc.mode_of_payment,
 		"reference_no": pdc.reference_no, "reference_date": pdc.reference_date,
 		"posting_date": pdc.posting_date, "amount": pdc.amount, "currency": pdc.account_currency,
 		"bank_account": pdc.bank_account, "notes": pdc.notes,
 		"payment_entry": _payment(pdc.payment_entry),
-		"invoices": [_invoice(row) for row in pdc.get("invoice_references") or []],
+		"invoices": invoices,
 	}
 
 
@@ -66,10 +71,24 @@ def _invoice(reference) -> dict:
 			row["expense_lines"] = frappe.get_all(
 				"Purchase Invoice Item",
 				filters={"parent": name, "parenttype": "Purchase Invoice"},
-				fields=["item_code", "item_name", "expense_account", "amount"],
+				fields=["item_code", "item_name", "expense_account", "amount", "project"],
 				order_by="idx asc",
 			)
 			row["expense_total"] = sum(line.amount or 0 for line in row["expense_lines"])
 		else:
 			row["expense_lines"] = []
+
+		# Purchase invoices commonly carry the project at item level rather than
+		# on the invoice header. Surface that project in both the invoice row and
+		# the cheque summary.
+		row["projects"] = _unique_projects(
+			[row.get("project")] + [line.get("project") for line in row["expense_lines"]]
+		)
+		if not row.get("project") and len(row["projects"]) == 1:
+			row["project"] = row["projects"][0]
 	return row
+
+
+def _unique_projects(projects: list[str | None]) -> list[str]:
+	"""Keep project links ordered and unique, ignoring blank values."""
+	return list(dict.fromkeys(project for project in projects if project))
