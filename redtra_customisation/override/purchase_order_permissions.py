@@ -2,14 +2,21 @@
 
 import frappe
 
+from redtra_customisation.override.company_permissions import get_company_permission_query_conditions
+
 
 def get_permission_query_conditions(user: str | None = None) -> str | None:
 	"""Listed users can only see non-stock Purchase Orders."""
 	user = user or frappe.session.user
-	if user == "Administrator" or not is_restricted_non_stock_user(user):
-		return None
+	conditions = []
+	company_condition = get_company_permission_query_conditions("Purchase Order", user)
+	if company_condition:
+		conditions.append(company_condition)
 
-	return "(`tabPurchase Order`.is_nonstock = 1)"
+	if user != "Administrator" and is_restricted_non_stock_user(user):
+		conditions.append("(`tabPurchase Order`.is_nonstock = 1)")
+
+	return " AND ".join(conditions) if conditions else None
 
 
 def has_permission(doc, ptype: str = "read", user: str | None = None) -> bool | None:

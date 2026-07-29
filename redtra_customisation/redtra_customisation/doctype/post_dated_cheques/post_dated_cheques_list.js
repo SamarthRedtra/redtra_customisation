@@ -13,6 +13,25 @@ frappe.listview_settings["Post Dated Cheques"] = {
 	]),
 	has_indicator_for_draft: true,
 	has_indicator_for_cancelled: true,
+	onload(listview) {
+		// The server enforces this scope. Add the single allowed Company as a
+		// visible List View filter too, so the user can immediately see why
+		// records from other companies are not included.
+		frappe.call({
+			method: "redtra_customisation.override.post_dated_cheques_permissions.get_current_user_companies",
+		}).then(({ message: companies }) => {
+			if (!Array.isArray(companies) || companies.length !== 1) {
+				return;
+			}
+
+			if (!listview.filter_area.filter_list.get_filter("company")) {
+				listview.filter_area.add("Post Dated Cheques", "company", "=", companies[0]);
+				// The async scope lookup happens after the first list request. Reload
+				// explicitly so the visible Company filter is applied immediately.
+				listview.refresh();
+			}
+		});
+	},
 	formatters: {
 		invoice_links_list(value, df, doc) {
 			if (!value) {

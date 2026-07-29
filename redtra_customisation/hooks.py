@@ -153,14 +153,16 @@ after_migrate = "redtra_customisation.pdc.install.after_migrate"
 # }
 permission_query_conditions = {
 	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.get_permission_query_conditions",
+	# "Purchase Receipt": "redtra_customisation.override.company_permissions.get_purchase_receipt_permission_query_conditions",
+	# "Purchase Invoice": "redtra_customisation.override.company_permissions.get_purchase_invoice_permission_query_conditions",
+	#"Post Dated Cheques": "redtra_customisation.override.post_dated_cheques_permissions.get_permission_query_conditions",
 }
 
 # has_permission = {
-# 	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.has_permission",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
+# 	"Purchase Order": "redtra_customisation.override.company_permissions.has_company_permission",
+# 	"Purchase Receipt": "redtra_customisation.override.company_permissions.has_company_permission",
+# 	"Purchase Invoice": "redtra_customisation.override.company_permissions.has_company_permission",
+# 	"Post Dated Cheques": "redtra_customisation.override.post_dated_cheques_permissions.has_permission",
 # }
 
 # DocType Class

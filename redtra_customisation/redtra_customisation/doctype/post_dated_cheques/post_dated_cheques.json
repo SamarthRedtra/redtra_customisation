@@ -57,7 +57,8 @@
   {
    "fieldname": "project",
    "fieldtype": "Link",
-   "in_list_view": 1,
+   "ignore_user_permissions": 1,
+   "in_list_view": 0,
    "label": "Project",
    "options": "Project"
   },
