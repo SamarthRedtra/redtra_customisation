@@ -14,7 +14,67 @@ def get_cheque_details(cheque_no: str) -> dict:
 		"Post Dated Cheques", filters={"reference_no": ("like", f"%{cheque_no}%")}, fields=["name"],
 		order_by="reference_no asc, reference_date desc, modified desc", limit_page_length=25,
 	)
-	return {"query": cheque_no, "matches": [_pdc_details(row.name) for row in rows]}
+	matches = [_pdc_details(row.name) for row in rows]
+	# A cheque may have been entered directly as a Payment Entry or as a
+	# Security Instrument, without a Post Dated Cheques document.
+	if not matches:
+		matches = _payment_entry_matches(cheque_no) + _security_instrument_matches(cheque_no)
+	return {"query": cheque_no, "matches": matches}
+
+
+def _payment_entry_matches(cheque_no: str) -> list[dict]:
+	if not frappe.has_permission("Payment Entry", "read"):
+		return []
+	rows = frappe.get_list(
+		"Payment Entry",
+		filters={"reference_no": ("like", f"%{cheque_no}%"), "docstatus": ("!=", 2)},
+		fields=["name"], order_by="posting_date desc, modified desc", limit_page_length=25,
+	)
+	return [_payment_entry_details(row.name) for row in rows]
+
+
+def _security_instrument_matches(cheque_no: str) -> list[dict]:
+	if not frappe.db.exists("DocType", "Security Instrument") or not frappe.has_permission("Security Instrument", "read"):
+		return []
+	rows = frappe.get_list(
+		"Security Instrument",
+		filters={"reference_no": ("like", f"%{cheque_no}%"), "docstatus": ("!=", 2)},
+		fields=["name"], order_by="reference_date desc, modified desc", limit_page_length=25,
+	)
+	return [_security_instrument_details(row.name) for row in rows]
+
+
+def _payment_entry_details(name: str) -> dict:
+	payment = _payment(name) or {}
+	invoices = payment.get("invoices", [])
+	projects = _unique_projects([payment.get("project")] + [project for invoice in invoices for project in invoice.get("projects", [])])
+	return {
+		"name": name, "source_doctype": "Payment Entry", "source_label": _("Payment Entry"),
+		"status": payment.get("status"), "company": payment.get("company"),
+		"project": payment.get("project") or (projects[0] if len(projects) == 1 else None), "projects": projects,
+		"party_type": payment.get("party_type"), "party": payment.get("party"), "party_name": payment.get("party"),
+		"payment_type": payment.get("payment_type"), "mode_of_payment": payment.get("mode_of_payment"),
+		"reference_no": payment.get("reference_no"), "reference_date": payment.get("reference_date"),
+		"posting_date": payment.get("posting_date"), "amount": payment.get("received_amount") or payment.get("paid_amount"),
+		"currency": payment.get("currency"), "bank_account": payment.get("paid_to") or payment.get("paid_from"),
+		"notes": payment.get("remarks"), "payment_entry": payment, "invoices": invoices,
+	}
+
+
+def _security_instrument_details(name: str) -> dict:
+	instrument = frappe.get_doc("Security Instrument", name)
+	payment = _payment(instrument.payment_entry)
+	invoices = (payment or {}).get("invoices", [])
+	return {
+		"name": name, "source_doctype": "Security Instrument", "source_label": _("Security Instrument"),
+		"status": instrument.status, "company": instrument.company, "project": instrument.project,
+		"projects": _unique_projects([instrument.project]), "party_type": instrument.party_type,
+		"party": instrument.party, "party_name": instrument.party, "payment_type": instrument.payment_type,
+		"mode_of_payment": instrument.mode_of_payment, "reference_no": instrument.reference_no,
+		"reference_date": instrument.reference_date, "posting_date": instrument.posting_date,
+		"amount": instrument.amount, "currency": None, "bank_account": instrument.bank_account,
+		"notes": instrument.remarks, "payment_entry": payment, "invoices": invoices,
+	}
 
 
 def _pdc_details(name: str) -> dict:
@@ -45,6 +105,7 @@ def _payment(name: str | None) -> dict | None:
 		return {"name": name, "has_access": False}
 	fields = [
 		"name",
+		"company",
 		"status",
 		"posting_date",
 		"reference_no",
@@ -56,10 +117,16 @@ def _payment(name: str | None) -> dict | None:
 		"paid_to",
 		"received_amount",
 		"paid_amount",
+		"paid_to_account_currency",
+		"paid_from_account_currency",
+		"remarks",
 	]
+	if frappe.get_meta("Payment Entry").has_field("project"):
+		fields.append("project")
 	row = frappe.db.get_value("Payment Entry", name, fields, as_dict=True)
 	if row:
 		row.has_access = True
+		row["currency"] = row.get("paid_to_account_currency") or row.get("paid_from_account_currency")
 		row["invoices"] = [
 			_invoice(reference)
 			for reference in frappe.get_all(
