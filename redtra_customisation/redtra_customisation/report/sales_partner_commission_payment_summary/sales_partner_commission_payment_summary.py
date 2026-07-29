@@ -163,7 +163,7 @@ def get_entries(filters):
 			date_field.as_("posting_date"),
 			dt.company,
 			dt.project,
-			dt.base_net_total.as_("amount"),
+			dt.base_total.as_("amount"),
 			dt.sales_partner,
 			employee.as_("employee"),
 			employee_name.as_("employee_name"),

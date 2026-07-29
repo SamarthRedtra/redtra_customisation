@@ -106,6 +106,8 @@ def _normalize_commission_doc(doc):
 
 
 def _get_sales_order_commission_base_amount(doc, row=None):
+	# Commission is payable on the invoice/order total before deductions, rather
+	# than the Net Total after retention and advance deductions.
 	order_total = flt(doc.get("base_total"))
 
 	if row and flt(row.get("allocated_percentage")) > 0:
@@ -213,6 +215,8 @@ def get_sales_invoice_commission_base_amount(
 	doc, row=None, force_net_total=False, force_total=False
 ):
 	if force_total:
+		# ``base_total`` is the commissionable business value before retention and
+		# advance deductions. ``base_net_total`` must not be used here.
 		total_amount = flt(doc.get("base_total"))
 		if row and flt(row.get("allocated_percentage")) > 0:
 			return total_amount * (flt(row.get("allocated_percentage")) / 100.0)

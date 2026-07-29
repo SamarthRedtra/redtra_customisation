@@ -5,7 +5,6 @@ from redtra_customisation.commission import (
 	_set_sales_partner_commission_fields,
 	get_project_commission_rate,
 	get_sales_invoice_commission_base_amount,
-	is_sales_invoice_from_sales_order,
 )
 from redtra_customisation.paid_invoice_commission import should_defer_commission_to_payment
 
@@ -359,10 +358,10 @@ def _build_commission_preview(doc, settings=None):
 		project_commission_rate = get_project_commission_rate(
 			doc.get("project"), settings=settings
 		)
-	use_total_for_commission = (
-		project_commission_rate is not None and is_sales_invoice_from_sales_order(doc)
-	)
-	use_net_total_for_commission = project_commission_rate is not None and not use_total_for_commission
+	# Commission is always calculated from the invoice business total before
+	# retention and advance deductions; never from Sales Invoice Net Total.
+	use_total_for_commission = True
+	use_net_total_for_commission = False
 
 	sales_person_cache = {}
 	rows = []

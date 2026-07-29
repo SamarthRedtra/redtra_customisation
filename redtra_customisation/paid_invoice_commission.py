@@ -145,13 +145,12 @@ def _get_si_base_amount(si_row: frappe._dict) -> float:
 			"base_total": si_row.base_total,
 			"base_net_total": si_row.base_net_total,
 			"amount_eligible_for_commission": si_row.amount_eligible_for_commission,
-			"items": [{"sales_order": "x"}] if from_so else [],
+		"items": [{"sales_order": "x"}] if from_so else [],
 		}
 	)
 	return get_sales_invoice_commission_base_amount(
 		doc,
-		force_total=from_so,
-		force_net_total=not from_so,
+		force_total=True,
 	)
 
 
@@ -316,6 +315,7 @@ def record_paid_invoice_commission(si_name: str, force: bool = False) -> bool:
 		[
 			"name",
 			"project",
+			"base_total",
 			"docstatus",
 			"outstanding_amount",
 			"sales_partner",
@@ -353,7 +353,11 @@ def record_paid_invoice_commission(si_name: str, force: bool = False) -> bool:
 	if not sales_person:
 		return False
 
-	incentives, amount_eligible = compute_true_up_incentives(si.project, si_name, rate)
+	# Each invoice carries its own commission.  Do not subtract commission that
+	# was recorded on earlier invoices in the project: that made the commission
+	# on a fully-paid invoice appear as only a residual amount.
+	amount_eligible = flt(si.base_total)
+	incentives = amount_eligible * (flt(rate) / 100.0)
 	preview = {
 		"commission_rate": rate,
 		"amount_eligible_for_commission": amount_eligible,

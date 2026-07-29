@@ -17,9 +17,20 @@ from redtra_customisation.paid_invoice_commission import (
 	should_defer_commission_to_payment,
 	sync_commission_from_payment_entry,
 )
+from redtra_customisation.commission import get_sales_invoice_commission_base_amount
 
 
 class TestPaidInvoiceCommission(UnitTestCase):
+	def test_invoice_commission_base_uses_total_before_deductions(self):
+		doc = frappe._dict(
+			base_total=1000,
+			base_net_total=900,
+			base_grand_total=1050,
+		)
+		self.assertEqual(
+			get_sales_invoice_commission_base_amount(doc, force_total=True), 1000
+		)
+
 	def test_should_defer_when_project_wise_enabled(self):
 		doc = frappe._dict(project="PROJ-1", custom_enable_sales_based=0)
 		settings = frappe._dict(enable_project_wise_commission=1)
@@ -170,6 +181,7 @@ class TestPaidInvoiceCommission(UnitTestCase):
 		si = frappe._dict(
 			name="SI-1",
 			project="PROJ-1",
+			base_total=4000,
 			docstatus=1,
 			outstanding_amount=0,
 			sales_partner="PARTNER-1",
