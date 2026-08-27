@@ -11,6 +11,7 @@ from redtra_customisation.purchase_invoice.custom_fields import (
 	PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS,
 	PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS,
 )
+from redtra_customisation.patches.v16_0.enable_foreign_currency_purchase_rates import apply_settings
 from redtra_customisation.setup import get_sales_partner_commission_custom_fields, get_work_order_custom_fields
 
 
@@ -81,6 +82,7 @@ def after_install():
 	create_custom_fields(get_sales_partner_commission_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()
+	apply_settings()
 	frappe.msgprint("PDC Management custom fields have been created")
 
 
@@ -93,3 +95,4 @@ def after_migrate():
 	create_custom_fields(get_sales_partner_commission_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()
+	apply_settings()
