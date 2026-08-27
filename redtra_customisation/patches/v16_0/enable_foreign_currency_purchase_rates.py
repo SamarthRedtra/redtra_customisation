@@ -1,7 +1,29 @@
 import frappe
 
 
-RATE_FIELDS = (
+TRANSACTION_DOCTYPES = (
+	"Supplier Quotation",
+	"Purchase Order",
+	"Purchase Receipt",
+	"Purchase Invoice",
+	"Quotation",
+	"Sales Order",
+	"Delivery Note",
+	"Sales Invoice",
+)
+
+TRANSACTION_ITEM_DOCTYPES = (
+	"Supplier Quotation Item",
+	"Purchase Order Item",
+	"Purchase Receipt Item",
+	"Purchase Invoice Item",
+	"Quotation Item",
+	"Sales Order Item",
+	"Delivery Note Item",
+	"Sales Invoice Item",
+)
+
+RATE_AND_AMOUNT_FIELDS = (
 	"price_list_rate",
 	"base_price_list_rate",
 	"rate_with_margin",
@@ -11,26 +33,38 @@ RATE_FIELDS = (
 	"net_rate",
 	"base_net_rate",
 	"stock_uom_rate",
+	"amount",
+	"base_amount",
+	"net_amount",
+	"base_net_amount",
+	"stock_uom_amount",
 )
-
-PURCHASE_ITEM_DOCTYPES = ("Purchase Order Item", "Purchase Invoice Item")
 
 
 def execute():
-	"""Enable foreign-currency purchasing and retain six-decimal unit rates."""
+	"""Enable multi-currency transaction controls and six-decimal amounts."""
 	apply_settings()
 
 
 def apply_settings():
-	"""Apply the purchase metadata after fixtures have been synced."""
-	_set_property("Purchase Order", "currency_and_price_list", "hidden", 0, "Check")
+	"""Apply transaction metadata after fixtures and custom fields have synced."""
+	for doctype in TRANSACTION_DOCTYPES:
+		_set_property_if_field_exists(doctype, "currency_and_price_list", "hidden", 0, "Check")
 
-	for doctype in PURCHASE_ITEM_DOCTYPES:
-		for fieldname in RATE_FIELDS:
-			_set_property(doctype, fieldname, "precision", 6, "Currency")
+	for doctype in TRANSACTION_ITEM_DOCTYPES:
+		for fieldname in RATE_AND_AMOUNT_FIELDS:
+			_set_property_if_field_exists(doctype, fieldname, "precision", 6, "Currency")
 
-	frappe.clear_cache(doctype="Purchase Order")
-	frappe.clear_cache(doctype="Purchase Invoice")
+	for doctype in (*TRANSACTION_DOCTYPES, *TRANSACTION_ITEM_DOCTYPES):
+		frappe.clear_cache(doctype=doctype)
+
+
+def _set_property_if_field_exists(doctype, fieldname, property_name, value, property_type):
+	"""Set a Property Setter only when the installed DocType contains the field."""
+	if not frappe.get_meta(doctype).has_field(fieldname):
+		return
+
+	_set_property(doctype, fieldname, property_name, value, property_type)
 
 
 def _set_property(doctype, fieldname, property_name, value, property_type):

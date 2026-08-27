@@ -213,6 +213,10 @@ doc_events = {
  "Stock Entry": {
     "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
  },
+	"Landed Cost Voucher": {
+		"on_submit": "redtra_customisation.override.landed_cost_voucher.reconcile_landed_cost_links",
+		"on_cancel": "redtra_customisation.override.landed_cost_voucher.reconcile_landed_cost_links",
+	},
 	"Sales Invoice": {
 		"validate": "redtra_customisation.redtra_customisation.custom.sales_invoice.calculate_profit_and_commission"
 	},
