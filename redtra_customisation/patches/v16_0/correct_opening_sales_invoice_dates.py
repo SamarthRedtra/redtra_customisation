@@ -17,6 +17,8 @@ def execute():
 	"""Apply the guarded, idempotent opening-balance date correction."""
 	if not frappe.db.exists("Company", COMPANY):
 		return
+	if not _has_mapped_invoices():
+		return
 
 	if len(INVOICE_DATE_MAP) != EXPECTED_INVOICE_COUNT:
 		frappe.throw(
@@ -26,6 +28,18 @@ def execute():
 	records = _preflight()
 	_apply_date_correction(records)
 	_verify_correction()
+
+
+def _has_mapped_invoices():
+	"""Return whether this site has any invoice from the Delta data correction."""
+	return bool(
+		frappe.get_all(
+			"Sales Invoice",
+			filters={"name": ("in", list(INVOICE_DATE_MAP))},
+			limit_page_length=1,
+			pluck="name",
+		)
+	)
 
 
 def _preflight():

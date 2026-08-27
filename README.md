@@ -4,20 +4,20 @@ Redtra Customisation
 
 ## Stock item dismantling / conversion
 
-Use standard ERPNext **Stock Entry** with Purpose set to **Repack**. Do not
-create a custom Stock Entry type.
+Use **Item Conversion / Dismantling** in Stock Entry. It is a Redtra-specific
+label that uses the standard Stock Entry ledger without ERPNext's Finished Good
+requirement.
 
-1. Add the source item as an outgoing row and select its **Source Warehouse**.
-2. Add one row for each resulting item, select each **Target Warehouse**, and
-   mark those rows as finished items.
-3. Save, then check the Stock Entry's total outgoing and incoming values before
-   submitting. ERPNext allocates the source valuation across the outputs, so
-   the incoming total equals the consumed value unless you deliberately enter
-   an additional cost.
+1. Add one or more source items with their **Source Warehouse**, then enter
+   their **Basic Rate**.
+2. Add one or more output items with their **Target Warehouse**, including new
+   items created for the conversion, then enter their **Basic Rate**.
+3. The type enables manual Basic Rate on every row. The **Is Finished Item**
+   checkbox is not used or shown.
+4. The combined output valuation must equal the combined source valuation.
 
-Validate the resulting stock ledger rows after submission: the source item's
-quantity decreases, each output item increases, and the total inventory value
-is conserved (apart from any explicit additional cost).
+This creates normal Stock Ledger and accounting entries; it does not introduce
+a separate inventory ledger.
 
 #### License
 

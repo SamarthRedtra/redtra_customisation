@@ -68,6 +68,7 @@ doctype_js = {
 		"public/js/purchase_invoice_expense_account.js",
 		"public/js/purchase_invoice_rounding.js",
 	],
+	"Stock Entry": "public/js/stock_entry_item_conversion.js",
 	"Item": "public/js/item_expense_account.js",
 	"Cash Bank Entry": "redtra_customisation/doctype/cash_bank_entry/cash_bank_entry.js",
 }
@@ -176,6 +177,7 @@ override_doctype_class = {
 	"Payroll Entry": "redtra_customisation.rpayroll.doctype.payroll_entry.payroll_entry.CustomPayrollEntry",
 	"Salary Slip": "redtra_customisation.rpayroll.doctype.salary_slip.salary_slip_overtime.SalarySlipOvertime",
 	"Shift Type": "redtra_customisation.rhr.doctype.shift_type.shift_type.ShiftType",
+	"Stock Entry": "redtra_customisation.override.stock_entry.CustomStockEntry",
 }
 
 # Document Events
@@ -211,6 +213,8 @@ doc_events = {
     "on_update_after_submit": "redtra_customisation.override.work_order.auto_complete_job_cards",
  },
  "Stock Entry": {
+	"before_validate": "redtra_customisation.override.item_conversion.prepare_item_conversion_entry",
+	"validate": "redtra_customisation.override.item_conversion.validate_item_conversion_entry",
     "on_submit": "redtra_customisation.override.work_order.auto_complete_job_cards_from_stock_entry",
  },
 	"Landed Cost Voucher": {

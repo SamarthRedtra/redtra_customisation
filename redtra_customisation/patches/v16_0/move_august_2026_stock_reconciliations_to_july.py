@@ -35,6 +35,9 @@ SUBMITTED_DOCUMENTS = (
 
 def execute():
 	"""Move the August opening-stock reconciliations to 31 July 2026."""
+	if not _target_documents_exist():
+		return
+
 	submitted_documents, cancelled_amendment = _validate_documents()
 	source_batch_allocations = _capture_source_batch_allocations(submitted_documents)
 	_create_missing_opening_batches(cancelled_amendment)
@@ -53,6 +56,9 @@ def execute():
 
 def correct_posting_dates():
 	"""Correct amendments created without Set Posting Time enabled."""
+	if not _target_documents_exist():
+		return
+
 	documents = _get_incorrectly_dated_amendments()
 	if not documents:
 		return
@@ -71,6 +77,22 @@ def correct_posting_dates():
 			source_batch_allocations[document.name],
 			posting_time=posting_times[document.name],
 		)
+
+
+def _target_documents_exist():
+	"""Return whether this site contains the complete Delta correction data set.
+
+	The patch is included in both local and production app deployments, but the
+	August 2026 opening-stock import exists only on Delta.  An incomplete target
+	set must be left untouched instead of attempting to load a missing document.
+	"""
+	target_names = [*SUBMITTED_DOCUMENTS, CANCELLED_DOCUMENT, CANCELLED_AMENDMENT]
+	existing_names = frappe.get_all(
+		"Stock Reconciliation",
+		filters={"name": ("in", target_names)},
+		pluck="name",
+	)
+	return len(existing_names) == len(target_names)
 
 
 def _create_and_submit_amendment(source, source_batch_allocations, posting_time=None):
