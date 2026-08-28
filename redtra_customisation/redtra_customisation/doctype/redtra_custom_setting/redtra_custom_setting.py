@@ -12,6 +12,53 @@ class RedtraCustomSetting(Document):
 		self.validate_sales_partner_commission_percentage()
 		self.ensure_default_project_commission_slabs()
 		self.validate_project_commission_slabs()
+		self.validate_purchase_type_mapping_permission()
+		self.validate_purchase_type_user_mappings()
+
+	def validate_purchase_type_mapping_permission(self):
+		if frappe.session.user == "Administrator":
+			return
+
+		if self.get_purchase_type_mappings_from_database() != self.get_purchase_type_mappings_from_document():
+			frappe.throw(
+				_("Only Administrator can change Purchase Type User Mappings."),
+				exc=frappe.PermissionError,
+			)
+
+	def get_purchase_type_mappings_from_database(self):
+		return sorted(
+			(
+				row.user,
+				row.purchase_type,
+				frappe.utils.cint(row.is_default),
+			)
+			for row in frappe.get_all(
+				"Purchase Type User Mapping",
+				filters={"parent": self.name, "parenttype": self.doctype},
+				fields=["user", "purchase_type", "is_default"],
+			)
+		)
+
+	def get_purchase_type_mappings_from_document(self):
+		return sorted(
+			(row.user, row.purchase_type, frappe.utils.cint(row.is_default))
+			for row in self.get("purchase_type_user_mappings") or []
+		)
+
+	def validate_purchase_type_user_mappings(self):
+		seen_mappings = set()
+		default_users = set()
+
+		for row in self.get("purchase_type_user_mappings") or []:
+			mapping = (row.user, row.purchase_type)
+			if mapping in seen_mappings:
+				frappe.throw(_("A user can be mapped to each Purchase Type only once."))
+			seen_mappings.add(mapping)
+
+			if frappe.utils.cint(row.is_default) and row.user in default_users:
+				frappe.throw(_("A user can have only one default Purchase Type."))
+			if frappe.utils.cint(row.is_default):
+				default_users.add(row.user)
 
 	def validate_sales_partner_commission_percentage(self):
 		commission_percentage = self.get("sales_partner_comssion_percentage")

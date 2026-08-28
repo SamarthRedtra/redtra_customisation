@@ -23,6 +23,7 @@
     "auto_sync_po_qty_on_receipt",
     "default_provisional_po_for_nonstock",
     "restrict_non_stockable_item_user",
+    "purchase_type_user_mappings",
     "purchase_invoice_section",
     "allow_any_account_on_purchase_invoice",
     "general_ledger_section",
@@ -147,6 +148,13 @@
       "label": "Restrict Non Stockable Item Users",
       "options": "Restrict Non Stockable Item User",
       "description": "Users listed here can only view and create non-stock Purchase Orders (Is Non Stock)."
+    },
+    {
+      "fieldname": "purchase_type_user_mappings",
+      "fieldtype": "Table",
+      "label": "Purchase Type User Mappings",
+      "options": "Purchase Type User Mapping",
+      "description": "Mapped users can select only their configured Purchase Types and can access only Purchase Orders they own."
     },
     {
       "fieldname": "purchase_invoice_section",

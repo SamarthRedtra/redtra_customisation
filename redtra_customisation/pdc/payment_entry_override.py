@@ -28,8 +28,11 @@ class CustomPaymentEntry(EmployeePaymentEntry):
 
 	def on_cancel(self):
 		super().on_cancel()
+		ignored_doctypes = tuple(self.ignore_linked_doctypes or ())
+		if self.flags.ignore_petty_cash_entry_link_on_cancel:
+			ignored_doctypes += ("Petty Cash Entry",)
 		self.ignore_linked_doctypes = tuple(
-			dict.fromkeys(tuple(self.ignore_linked_doctypes or ()) + ("Post Dated Cheques",))
+			dict.fromkeys(ignored_doctypes + ("Post Dated Cheques",))
 		)
 		self._unlink_converted_pdc()
 

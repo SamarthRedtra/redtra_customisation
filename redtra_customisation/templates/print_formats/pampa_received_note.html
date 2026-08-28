@@ -1,0 +1,75 @@
+{% set company = frappe.get_doc("Company", doc.company) %}
+{% set supplier = frappe.get_doc("Supplier", doc.supplier) if doc.supplier else None %}
+{% set supplier_address_name = doc.supplier_address or (supplier.supplier_primary_address if supplier else None) %}
+{% set supplier_address = frappe.get_doc("Address", supplier_address_name) if supplier_address_name else None %}
+{% set company_address_name = company.company_address or doc.company_address or doc.shipping_address %}
+{% set company_address = frappe.get_doc("Address", company_address_name) if company_address_name else None %}
+{% set purchase_orders = [] %}
+{% for item in doc.items %}{% if item.purchase_order and item.purchase_order not in purchase_orders %}{% set ignored = purchase_orders.append(item.purchase_order) %}{% endif %}{% endfor %}
+
+{% macro address_lines(address) -%}
+	{%- if address -%}
+		{%- if address.address_line1 -%}{{ address.address_line1 }}<br>{%- endif -%}
+		{%- if address.address_line2 -%}{{ address.address_line2 }}<br>{%- endif -%}
+		{%- if address.city -%}{{ address.city }}{%- endif -%}
+		{%- if address.state -%}{% if address.city %}, {% endif %}{{ address.state }}{%- endif -%}
+		{%- if address.pincode -%}{% if address.city or address.state %} - {% endif %}{{ address.pincode }}{%- endif -%}
+		{%- if address.city or address.state or address.pincode -%}<br>{%- endif -%}
+		{%- if address.country -%}{{ address.country }}<br>{%- endif -%}
+		{%- if address.phone -%}Tel: {{ address.phone }}<br>{%- endif -%}
+		{%- if address.fax -%}Fax: {{ address.fax }}<br>{%- endif -%}
+		{%- if address.email_id -%}E-mail: {{ address.email_id }}{%- endif -%}
+	{%- endif -%}
+{%- endmacro %}
+
+<style>
+	@page { size: A4 portrait; margin: 6mm; }
+	* { box-sizing: border-box; }
+	body { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 9px; line-height: 1.2; }
+	.document { width: 100%; }
+	.document table { border-collapse: collapse; width: 100%; }
+	.document th, .document td { padding: 0 !important; vertical-align: top; }
+	.company { font-size: 9.5px; font-weight: 600; line-height: 1.28; padding: 1mm 2mm 2mm 1mm; }
+	.company-name { font-size: 14px; font-weight: 700; margin-bottom: 1mm; }
+	.meta, .supplier-box, .details, .items, .signatures { border: 0.35mm solid #222; }
+	.meta th, .meta td, .details th, .details td, .items th, .items td, .signatures td { border: 0.25mm solid #222; }
+	.meta th, .meta td { padding: 2.2mm 2mm !important; }
+	.meta-title { font-size: 17px; font-weight: 700; text-align: center; }
+	.meta th { font-size: 10px; text-align: left; width: 40%; }
+	.supplier-box { height: 42mm; margin-top: 3mm; padding: 3mm; }
+	.supplier-label { font-size: 13px; font-weight: 700; margin-bottom: 2mm; }
+	.supplier-name { font-size: 11px; font-weight: 700; margin-bottom: 1.5mm; }
+	.address { font-size: 9.5px; line-height: 1.3; }
+	.details { margin-top: -0.35mm; }
+	.details th, .details td { padding: 1.5mm 2mm !important; }
+	.details th { font-size: 9px; font-weight: 400; text-align: left; }
+	.details td { height: 8mm; }
+	.items { margin-top: 2mm; table-layout: fixed; }
+	.items th { font-size: 10px; font-weight: 700; padding: 1.5mm 1mm !important; text-align: left; }
+	.items td { border-left: 0.25mm solid #222; border-right: 0.25mm solid #222; height: 8mm; padding: 1.5mm 1mm !important; }
+	.items .center { text-align: center; }
+	.items .number { text-align: right; white-space: nowrap; }
+	.items .description { overflow-wrap: anywhere; }
+	.items .blank td { height: 8mm; }
+	.items tfoot td { border: 0.25mm solid #222; font-weight: 700; }
+	.signatures { margin-top: 3mm; }
+	.signatures td { height: 46mm; padding: 4mm !important; vertical-align: bottom; }
+	.signature-line { border-bottom: 0.25mm solid #222; display: block; height: 25mm; margin-bottom: 2mm; width: 82%; }
+	.signature-label { font-size: 10px; font-weight: 700; }
+</style>
+
+<div class="document">
+	<table><tr><td style="width: 56%;"><div class="company"><div class="company-name">{{ company.company_name }}</div>{{ address_lines(company_address) }}{% if company.website %}Website: {{ company.website }}<br>{% endif %}{% if company.tax_id %}VAT TRN: {{ company.tax_id }}{% endif %}</div></td><td style="width: 44%;"><table class="meta"><tr><td colspan="2" class="meta-title">G/Received Note</td></tr><tr><th>GRN Date</th><td>{{ frappe.utils.formatdate(doc.posting_date, "dd-MM-yyyy") if doc.posting_date else "" }}</td></tr><tr><th>GRN No.</th><td>{{ doc.name }}</td></tr><tr><th>Supplier Ref</th><td>{{ doc.custom_supplier_ref or doc.bill_no or "" }}</td></tr></table></td></tr></table>
+
+	<div class="supplier-box"><div class="supplier-label">Supplier:</div><div class="supplier-name">{{ doc.supplier_name or doc.supplier }}</div><div class="address">{{ address_lines(supplier_address) }}</div></div>
+	<table class="details"><tr><th style="width: 18%;">Account</th><th style="width: 28%;">PO No.</th><th style="width: 27%;">Supp. DO No.</th><th style="width: 27%;">Bill No.</th></tr><tr><td>{{ doc.supplier or "" }}</td><td>{{ purchase_orders | join(", ") }}</td><td>{{ doc.supplier_delivery_note or "" }}</td><td>{{ doc.bill_no or "" }}</td></tr></table>
+
+	{% set rows_per_page = 13 %}
+	{% set total_pages = ((doc.items | length - 1) // rows_per_page) + 1 if doc.items else 1 %}
+	{% for page in range(total_pages) %}
+		{% set page_items = doc.items[page * rows_per_page:(page + 1) * rows_per_page] %}
+		{% if page %}<div style="page-break-before: always;"></div>{% endif %}
+		<table class="items"><thead><tr><th style="width: 15%;">Code</th><th style="width: 42%;">Description</th><th style="width: 23%;">Store</th><th style="width: 9%;">Unit</th><th style="width: 11%;" class="number">Qty</th></tr></thead><tbody>{% for item in page_items %}<tr><td>{{ item.item_code or "" }}</td><td class="description">{{ frappe.utils.strip_html(item.description or item.item_name or "") }}</td><td>{{ item.warehouse or "" }}</td><td class="center">{{ item.uom or item.stock_uom or "" }}</td><td class="number">{{ frappe.format_value(item.qty, {"fieldtype": "Float", "precision": item.precision("qty")}) }}</td></tr>{% endfor %}{% for unused_row in range([rows_per_page - (page_items | length), 0] | max) %}<tr class="blank"><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>{% endfor %}</tbody>{% if page == total_pages - 1 %}<tfoot><tr><td>Total</td><td></td><td></td><td></td><td class="number">{{ frappe.format_value(doc.total_qty, {"fieldtype": "Float", "precision": doc.precision("total_qty")}) }}</td></tr></tfoot>{% endif %}</table>
+		{% if page == total_pages - 1 %}<table class="signatures"><tr><td style="width: 33%;"><span class="signature-line"></span><span class="signature-label">Received by</span></td><td style="width: 34%; text-align: center;"><span class="signature-line" style="margin-left: auto; margin-right: auto;"></span><span class="signature-label">Inspected by</span></td><td style="width: 33%; text-align: right;"><span class="signature-line" style="margin-left: auto;"></span><span class="signature-label">Approved by</span></td></tr></table>{% endif %}
+	{% endfor %}
+</div>

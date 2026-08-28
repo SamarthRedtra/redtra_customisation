@@ -3,10 +3,12 @@
 frappe.ui.form.on("Purchase Order", {
 	onload(frm) {
 		apply_non_stock_user_defaults(frm);
+		setup_purchase_type(frm);
 		setup_provisional_po_form(frm);
 	},
 	refresh(frm) {
 		apply_non_stock_user_defaults(frm);
+		setup_purchase_type(frm);
 		setup_provisional_po_form(frm);
 		setup_provisional_purchase_receipt_button(frm);
 		setup_restricted_update_items(frm);
@@ -24,6 +26,28 @@ function apply_non_stock_user_defaults(frm) {
 			}
 
 			frm.set_df_property("is_nonstock", "read_only", 1);
+		},
+	});
+}
+
+function setup_purchase_type(frm) {
+	if (!frm.fields_dict.custom_purchase_type) {
+		return;
+	}
+
+	frappe.call({
+		method:
+			"redtra_customisation.override.purchase_order_permissions.get_current_user_purchase_type_configuration",
+		callback(r) {
+			const configuration = r.message || {};
+			const allowedTypes = configuration.allowed_types || ["Domestic", "International", "Admin"];
+
+			frm.set_df_property("custom_purchase_type", "options", allowedTypes.join("\n"));
+			frm.set_df_property("custom_purchase_type", "reqd", 1);
+
+			if (frm.is_new() && !frm.doc.custom_purchase_type && configuration.default_type) {
+				frm.set_value("custom_purchase_type", configuration.default_type);
+			}
 		},
 	});
 }

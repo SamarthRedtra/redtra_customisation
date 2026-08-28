@@ -1,0 +1,12 @@
+{
+ "app": "redtra_customisation",
+ "bg_color": "gray",
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_type": "Link",
+ "label": "Petty Cash Entry",
+ "link_to": "Petty Cash Entry",
+ "link_type": "Workspace Sidebar",
+ "name": "Petty Cash Entry",
+ "standard": 1
+}

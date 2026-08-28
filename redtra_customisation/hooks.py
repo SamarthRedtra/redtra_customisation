@@ -106,10 +106,11 @@ doctype_tree_js = {"Account" : "public/js/account_tree.js",
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "redtra_customisation.utils.jinja_methods",
-# 	"filters": "redtra_customisation.utils.jinja_filters"
-# }
+jinja = {
+	"methods": [
+		"redtra_customisation.purchase_print_formats.get_letter_head_html",
+	],
+}
 
 # Installation
 # ------------
@@ -157,10 +158,9 @@ permission_query_conditions = {
 	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.get_permission_query_conditions",
 }
 
-# has_permission = {
-# 	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.has_permission",
-# }
-#
+has_permission = {
+	"Purchase Order": "redtra_customisation.override.purchase_order_permissions.has_permission",
+}
 # has_permission = {
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
@@ -193,6 +193,7 @@ doc_events = {
  "Purchase Order": {
     "before_insert": [
         "redtra_customisation.override.purchase_order_permissions.set_default_is_nonstock",
+        "redtra_customisation.override.purchase_order_permissions.set_purchase_type_defaults",
         "redtra_customisation.override.provisional_purchase_order.set_default_provisional_po",
     ],
     "validate": "redtra_customisation.override.purchase_order_permissions.validate_non_stock_user_po",

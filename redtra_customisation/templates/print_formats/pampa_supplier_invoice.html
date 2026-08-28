@@ -1,0 +1,111 @@
+{% set company = frappe.get_doc("Company", doc.company) %}
+{% set supplier = frappe.get_doc("Supplier", doc.supplier) if doc.supplier else None %}
+{% set supplier_address_name = doc.supplier_address or (supplier.supplier_primary_address if supplier else None) %}
+{% set supplier_address = frappe.get_doc("Address", supplier_address_name) if supplier_address_name else None %}
+{% set company_address_name = company.company_address or doc.company_address %}
+{% set company_address = frappe.get_doc("Address", company_address_name) if company_address_name else None %}
+{% set first_item = doc.items[0] if doc.items else None %}
+{% set adjustment = (doc.grand_total or 0) - ((doc.net_total or 0) + (doc.total_taxes_and_charges or 0)) %}
+{% set grn_numbers = [] %}
+{% for item in doc.items %}
+	{% set receipt = item.purchase_receipt or (frappe.db.get_value("Purchase Receipt Item", item.pr_detail, "parent") if item.pr_detail else None) %}
+	{% if receipt and receipt not in grn_numbers %}{% set ignored = grn_numbers.append(receipt) %}{% endif %}
+{% endfor %}
+
+{% macro address_lines(address) -%}
+	{%- if address -%}
+		{%- if address.address_line1 -%}{{ address.address_line1 }}<br>{%- endif -%}
+		{%- if address.address_line2 -%}{{ address.address_line2 }}<br>{%- endif -%}
+		{%- if address.city -%}{{ address.city }}{%- endif -%}
+		{%- if address.state -%}{% if address.city %}, {% endif %}{{ address.state }}{%- endif -%}
+		{%- if address.pincode -%}{% if address.city or address.state %} - {% endif %}{{ address.pincode }}{%- endif -%}
+		{%- if address.city or address.state or address.pincode -%}<br>{%- endif -%}
+		{%- if address.country -%}{{ address.country }}<br>{%- endif -%}
+	{%- endif -%}
+{%- endmacro %}
+
+<style>
+	@page { size: A4 portrait; margin: 6mm; }
+	* { box-sizing: border-box; }
+	body { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 9px; line-height: 1.2; }
+	.document { width: 100%; }
+	.document table { border-collapse: collapse; width: 100%; }
+	.document th, .document td { padding: 0 !important; vertical-align: top; }
+	.logo-block img { max-height: 70px; max-width: 100%; }
+	.title { font-size: 18px; font-weight: 700; text-align: center; padding: 9mm 0 3mm; }
+	.company-trn { font-size: 10px; padding: 0 0 3mm 7mm; text-align: center; }
+	.box, .meta, .details, .items, .totals, .signature-box { border: 0.35mm solid #222; }
+	.meta th, .meta td, .details th, .details td, .items th, .items td, .totals th, .totals td { border: 0.25mm solid #222; }
+	.meta th, .meta td { padding: 2.2mm 2mm !important; }
+	.meta th { font-size: 10px; text-align: left; width: 48%; }
+	.supplier-box { height: 46mm; padding: 3mm; }
+	.supplier-label { font-size: 13px; font-weight: 700; margin-bottom: 2mm; }
+	.supplier-name { font-size: 11px; font-weight: 700; margin-bottom: 1.5mm; }
+	.address { font-size: 9.5px; line-height: 1.28; }
+	.supplier-trn { font-size: 9.5px; margin-top: 9mm; }
+	.details { margin-top: -0.35mm; }
+	.details th, .details td { padding: 1.5mm 1.8mm !important; }
+	.details th { font-weight: 400; text-align: left; }
+	.details td { height: 8mm; }
+	.items { margin-top: 2mm; table-layout: fixed; }
+	.items th { font-size: 9.5px; font-weight: 700; padding: 1.5mm 1mm !important; text-align: left; }
+	.items td { border-left: 0.25mm solid #222; border-right: 0.25mm solid #222; height: 7mm; padding: 1.4mm 1mm !important; }
+	.items .number { text-align: right; white-space: nowrap; }
+	.items .center { text-align: center; }
+	.items .description { overflow-wrap: anywhere; }
+	.items .blank td { height: 7mm; }
+	.items tfoot td { border: 0.25mm solid #222; font-weight: 700; }
+	.footer { margin-top: 3mm; }
+	.signature-box { height: 52mm; padding: 4mm; }
+	.signature-label { font-size: 10px; font-weight: 700; }
+	.signature-line { border-bottom: 0.25mm solid #222; display: inline-block; height: 10mm; min-width: 46mm; vertical-align: bottom; }
+	.signature-bottom { margin-top: 8mm; }
+	.totals th, .totals td { font-size: 10px; padding: 2mm !important; }
+	.totals th { font-weight: 700; text-align: left; width: 56%; }
+	.totals td { text-align: right; white-space: nowrap; }
+	.totals .net th, .totals .net td { font-size: 12px; font-weight: 700; padding: 3mm 2mm !important; }
+</style>
+
+<div class="document">
+	<table>
+		<tr>
+			<td style="width: 58%;"><div class="logo-block">{{ get_letter_head_html(company.name, letter_head) }}</div></td>
+			<td style="width: 42%;"><div class="title">Supplier Invoice</div><div class="company-trn">TRN: &nbsp;&nbsp;&nbsp; {{ doc.company_tax_id or company.tax_id or "" }}</div></td>
+		</tr>
+	</table>
+
+	<table>
+		<tr>
+			<td style="width: 58%; padding-right: 2mm !important;"><div class="box supplier-box"><div class="supplier-label">Supplier:</div><div class="supplier-name">{{ doc.supplier_name or doc.supplier }}</div><div class="address">{{ address_lines(supplier_address) }}</div><div class="supplier-trn">TRN: &nbsp;&nbsp;&nbsp; {{ supplier.tax_id if supplier and supplier.tax_id else "" }}</div></div></td>
+			<td style="width: 42%; padding-left: 2mm !important;"><table class="meta"><tr><th>PV Date</th><td>{{ frappe.utils.formatdate(doc.posting_date, "dd-MM-yyyy") if doc.posting_date else "" }}</td></tr><tr><th>PV Number</th><td>{{ doc.name }}</td></tr><tr><th>Supplier Ref</th><td>{{ doc.bill_no or "" }}</td></tr></table></td>
+		</tr>
+	</table>
+
+	<table class="details">
+		<tr><th style="width: 17%;">Account</th><th style="width: 22%;">GRN No.</th><th style="width: 12%;">Dis %</th><th style="width: 25%;">Store</th><th style="width: 24%;">Cost Code</th></tr>
+		<tr><td>{{ doc.supplier or "" }}</td><td>{{ grn_numbers | join(", ") }}</td><td>{{ doc.additional_discount_percentage or 0 }}</td><td>{{ first_item.warehouse if first_item else "" }}</td><td>{{ first_item.cost_center if first_item else "" }}</td></tr>
+	</table>
+
+	{% set rows_per_page = 12 %}
+	{% set total_pages = ((doc.items | length - 1) // rows_per_page) + 1 if doc.items else 1 %}
+	{% for page in range(total_pages) %}
+		{% set page_items = doc.items[page * rows_per_page:(page + 1) * rows_per_page] %}
+		{% if page %}<div style="page-break-before: always;"></div>{% endif %}
+		<table class="items">
+			<thead><tr><th style="width: 12%;">Code</th><th style="width: 28%;">Description</th><th style="width: 8%;">Unit</th><th style="width: 15%;">Cost Code</th><th style="width: 7%;" class="number">Qty</th><th style="width: 10%;" class="number">U/Price</th><th style="width: 9%;" class="number">VAT</th><th style="width: 11%;" class="number">Total Price<br>{{ doc.currency }}</th></tr></thead>
+			<tbody>
+				{% for item in page_items %}
+					{% set line_tax = item.get("tax_amount") if item.meta.has_field("tax_amount") else (((item.amount or 0) / (doc.net_total or 1)) * (doc.total_taxes_and_charges or 0)) %}
+					{% set line_total = item.get("total_amount") if item.meta.has_field("total_amount") else ((item.amount or 0) + (line_tax or 0)) %}
+					<tr><td>{{ item.item_code or "" }}</td><td class="description">{{ frappe.utils.strip_html(item.description or item.item_name or "") }}</td><td>{{ item.uom or item.stock_uom or "" }}</td><td>{{ item.cost_center or "" }}</td><td class="number">{{ frappe.format_value(item.qty, {"fieldtype": "Float", "precision": item.precision("qty")}) }}</td><td class="number">{{ "{:.6f}".format(item.rate or 0) }}</td><td class="number">{{ "{:.6f}".format(line_tax or 0) }}</td><td class="number">{{ "{:.6f}".format(line_total or 0) }}</td></tr>
+				{% endfor %}
+				{% for unused_row in range([rows_per_page - (page_items | length), 0] | max) %}<tr class="blank"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>{% endfor %}
+			</tbody>
+			{% if page == total_pages - 1 %}<tfoot><tr><td>Total</td><td></td><td></td><td></td><td class="number">{{ frappe.format_value(doc.total_qty, {"fieldtype": "Float", "precision": doc.precision("total_qty")}) }}</td><td></td><td class="number">{{ "{:.6f}".format(doc.total_taxes_and_charges or 0) }}</td><td></td></tr></tfoot>{% endif %}
+		</table>
+
+		{% if page == total_pages - 1 %}
+			<table class="footer"><tr><td style="width: 62%; padding-right: 2mm !important;"><div class="signature-box"><table><tr><td style="width: 52%;"><span class="signature-label">Prepared by:</span> <span class="signature-line"></span></td><td><span class="signature-label">Accountant:</span> <span class="signature-line"></span></td></tr></table><div class="signature-bottom"><span class="signature-label">For {{ company.company_name }}</span><br><br><span class="signature-line"></span><br><span class="signature-label">Financial Controller</span><span style="margin-left: 25mm;" class="signature-label">Date:</span> <span class="signature-line" style="min-width: 30mm;"></span></div></div></td><td style="width: 38%; padding-left: 2mm !important;"><table class="totals"><tr><th>Sub Total :</th><td>{{ "{:.6f}".format(doc.total or 0) }}</td></tr><tr><th>Discount :</th><td>{{ "{:.6f}".format(doc.discount_amount or 0) }}</td></tr><tr><th>Taxable :</th><td>{{ "{:.6f}".format(doc.net_total or 0) }}</td></tr><tr><th>VAT@5% :</th><td>{{ "{:.6f}".format(doc.total_taxes_and_charges or 0) }}</td></tr><tr><th>Adjustment :</th><td>{{ "{:.6f}".format(adjustment) }}</td></tr><tr class="net"><th>Net Payable:</th><td>{{ doc.currency }} &nbsp; {{ "{:.6f}".format(doc.grand_total or 0) }}</td></tr></table></td></tr></table>
+		{% endif %}
+	{% endfor %}
+</div>

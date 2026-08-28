@@ -1,0 +1,9 @@
+{
+ "app": "redtra_customisation",
+ "doctype": "Workspace Sidebar",
+ "items": [{"child": 0, "collapsible": 1, "icon": "money-coins-1", "indent": 0, "keep_closed": 0, "label": "Petty Cash Entry", "link_to": "Petty Cash Entry", "link_type": "DocType", "show_arrow": 0, "type": "Link"}],
+ "module": "Redtra Customisation",
+ "name": "Petty Cash Entry",
+ "standard": 1,
+ "title": "Petty Cash Entry"
+}

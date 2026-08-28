@@ -1,0 +1,96 @@
+{% set company = frappe.get_doc("Company", doc.company) %}
+{% set prepared_by = frappe.db.get_value("User", doc.owner, "full_name") or doc.owner %}
+{% set cash_account = frappe.get_doc("Account", doc.cash_account) if doc.cash_account else None %}
+
+<style>
+	@page { size: A4 portrait; margin: 6mm; }
+	* { box-sizing: border-box; }
+	body { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 9px; line-height: 1.25; }
+	.voucher { width: 100%; }
+	.voucher table { width: 100%; border-collapse: collapse; }
+	.voucher td, .voucher th { padding: 0; vertical-align: top; }
+	.letterhead img { max-height: 54px; max-width: 100%; }
+	.company-name { font-size: 14px; font-weight: 700; }
+	.company-details { padding-top: 2mm; font-size: 9px; font-weight: 600; line-height: 1.32; }
+	.title { margin: 3mm 0 4mm; text-align: center; color: #7b4b00; font-size: 17px; font-weight: 700; text-decoration: underline; }
+	.meta { border-bottom: 0.3mm solid #111; padding-bottom: 2mm; }
+	.meta-line { margin: 1.5mm 0; }
+	.amount-box { border: 0.3mm solid #111; display: inline-block; font-size: 11px; font-weight: 700; padding: 2.5mm 6mm; }
+	.items { margin-top: 2mm; table-layout: fixed; border: 0.3mm solid #111; }
+	.items th { border: 0.25mm solid #111; padding: 2mm 1mm !important; font-size: 9px; text-align: left; }
+	.items td { border-left: 0.25mm solid #111; border-right: 0.25mm solid #111; padding: 2mm 1mm !important; height: 8mm; overflow-wrap: anywhere; }
+	.items .amount { text-align: right; white-space: nowrap; }
+	.items .blank td { height: 8mm; }
+	.items tfoot td { border: 0.25mm solid #111; font-weight: 700; }
+	.signatures { border: 0.3mm solid #111; margin-top: 5mm; min-height: 39mm; padding: 7mm 4mm 3mm; }
+	.signature-label { font-size: 10px; font-weight: 700; }
+	.page { margin-top: 3mm; text-align: right; font-size: 8px; }
+</style>
+
+<div class="voucher">
+	<table>
+		<tr>
+			<td style="width: 58%;">
+				{% if letter_head %}<div class="letterhead">{{ letter_head }}</div>{% endif %}
+				<div class="company-name">{{ company.company_name }}</div>
+				<div class="company-details">
+					{% if company.phone_no %}Tel: {{ company.phone_no }}<br>{% endif %}
+					{% if company.email %}E-mail: {{ company.email }}<br>{% endif %}
+					{% if company.website %}Website: {{ company.website }}<br>{% endif %}
+					{% if company.tax_id %}VAT TRN: {{ company.tax_id }}{% endif %}
+				</div>
+			</td>
+			<td style="width: 42%; text-align: right;">
+				<div class="title">PETTY CASH VOUCHER</div>
+				<div class="amount-box">{{ company.default_currency }} {{ "%.2f"|format(doc.total_amount or 0) }}</div>
+			</td>
+		</tr>
+	</table>
+
+	<div class="meta">
+		<table>
+			<tr>
+				<td style="width: 60%;">
+					<div class="meta-line"><strong>No.:</strong> {{ doc.name }}</div>
+					<div class="meta-line"><strong>Cash/Bank A/C:</strong> {{ doc.cash_account or "" }}</div>
+					<div class="meta-line"><strong>Cheque/Cash:</strong> {{ doc.mode_of_payment or "" }}</div>
+					<div class="meta-line"><strong>Paid To:</strong> {{ doc.party_name or doc.party or "" }}</div>
+					<div class="meta-line"><strong>Narration:</strong> {{ doc.narration or "" }}</div>
+				</td>
+				<td style="width: 40%; text-align: right;"><strong>Date:</strong> {{ frappe.utils.formatdate(doc.posting_date, "dd-MM-yyyy") }}</td>
+			</tr>
+		</table>
+	</div>
+
+	<table class="items">
+		<thead><tr>
+			<th style="width: 12%;">Code</th><th style="width: 24%;">Description</th><th style="width: 31%;">Remarks</th><th style="width: 13%;" class="amount">Amount Paid</th><th style="width: 10%;">Cost Code</th><th style="width: 10%;">Contra</th>
+		</tr></thead>
+		<tbody>
+			{% for row in doc.expense_lines %}
+				{% set account = frappe.get_doc("Account", row.expense_account) if row.expense_account else None %}
+				<tr>
+					<td>{{ account.account_number if account and account.account_number else row.expense_account or "" }}</td>
+					<td>{{ account.account_name if account else "" }}</td>
+					<td>{{ row.remarks or "" }}</td>
+					<td class="amount">{{ "%.2f"|format(row.amount or 0) }}</td>
+					<td>{{ row.cost_center or doc.cost_center or "" }}</td>
+					<td>{{ cash_account.account_number if cash_account and cash_account.account_number else doc.cash_account or "" }}</td>
+				</tr>
+			{% endfor %}
+			{% for unused in range([15 - (doc.expense_lines | length), 0] | max) %}
+				<tr class="blank"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+			{% endfor %}
+		</tbody>
+		<tfoot><tr><td colspan="3">Total</td><td class="amount">{{ "%.2f"|format(doc.total_amount or 0) }}</td><td></td><td></td></tr></tfoot>
+	</table>
+
+	<div class="signatures">
+		<table><tr>
+			<td style="width: 33%;"><span class="signature-label">Prepared by:</span> {{ prepared_by }}</td>
+			<td style="width: 33%;"><span class="signature-label">Accountant:</span></td>
+			<td><span class="signature-label">Financial Controller:</span></td>
+		</tr></table>
+	</div>
+	<div class="page">Page: <span class="page-number"></span></div>
+</div>

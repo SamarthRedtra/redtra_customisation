@@ -11,6 +11,12 @@ from redtra_customisation.purchase_invoice.custom_fields import (
 	PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS,
 	PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS,
 )
+from redtra_customisation.purchase_order_custom_fields import PURCHASE_ORDER_CUSTOM_FIELDS
+from redtra_customisation.purchase_order_print_format import ensure_pampa_purchase_order_print_format
+from redtra_customisation.purchase_print_formats import ensure_pampa_purchase_print_formats
+from redtra_customisation.petty_cash_print_format import ensure_petty_cash_print_format
+from redtra_customisation.petty_cash_custom_fields import PETTY_CASH_LINK_CUSTOM_FIELDS
+from redtra_customisation.stock_entry_print_formats import ensure_stock_entry_print_formats
 from redtra_customisation.patches.v16_0.enable_foreign_currency_purchase_rates import apply_settings
 from redtra_customisation.setup import get_sales_partner_commission_custom_fields, get_work_order_custom_fields
 
@@ -77,8 +83,14 @@ def after_install():
 	"""Create custom fields after app installation"""
 	create_custom_fields(PDC_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(CBE_LINK_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PETTY_CASH_LINK_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PURCHASE_ORDER_CUSTOM_FIELDS, ignore_validate=True)
+	ensure_pampa_purchase_order_print_format()
+	ensure_pampa_purchase_print_formats()
+	ensure_petty_cash_print_format()
+	ensure_stock_entry_print_formats()
 	create_custom_fields(get_sales_partner_commission_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()
@@ -90,8 +102,14 @@ def after_migrate():
 	"""Create custom fields after migration"""
 	create_custom_fields(PDC_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(CBE_LINK_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PETTY_CASH_LINK_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PURCHASE_ORDER_CUSTOM_FIELDS, ignore_validate=True)
+	ensure_pampa_purchase_order_print_format()
+	ensure_pampa_purchase_print_formats()
+	ensure_petty_cash_print_format()
+	ensure_stock_entry_print_formats()
 	create_custom_fields(get_sales_partner_commission_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()
