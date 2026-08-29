@@ -26,6 +26,8 @@
     "purchase_type_user_mappings",
     "purchase_invoice_section",
     "allow_any_account_on_purchase_invoice",
+	"default_purchase_invoice_discount_account",
+	"default_purchase_invoice_adjustment_account",
     "general_ledger_section",
     "include_against_account_entries_in_gl",
     "group_by_against_voucher_in_gl",
@@ -168,6 +170,20 @@
       "label": "Allow Any Account on Purchase Invoice Expense Head",
       "description": "When enabled, users can select any non-group account for the company on PI item Expense Head (Asset, Liability, Equity, Income, or Expense)."
     },
+	{
+	  "fieldname": "default_purchase_invoice_discount_account",
+	  "fieldtype": "Link",
+	  "label": "Default Purchase Invoice Discount Account",
+	  "options": "Account",
+	  "description": "Automatically used for Purchase Invoice and Purchase Order item discounts when no account is selected on the row."
+	},
+	{
+	  "fieldname": "default_purchase_invoice_adjustment_account",
+	  "fieldtype": "Link",
+	  "label": "Default Purchase Invoice Adjustment Account",
+	  "options": "Account",
+	  "description": "Automatically used for Purchase Invoice adjustments when no account is selected on the row."
+	},
     {
       "fieldname": "general_ledger_section",
       "fieldtype": "Section Break",

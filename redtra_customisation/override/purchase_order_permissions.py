@@ -50,15 +50,13 @@ def set_default_is_nonstock(doc, method=None):
 
 
 def set_purchase_type_defaults(doc, method=None):
-	"""Set a configured default and prevent mapped users from choosing another owner."""
-	if not doc.is_new():
-		return
-
+	"""Set a mapped user's Purchase Type default for every draft save path."""
 	user = frappe.session.user
 	if not is_purchase_type_mapped_user(user):
 		return
 
-	doc.owner = user
+	if _doc_is_new(doc):
+		doc.owner = user
 	configuration = get_purchase_type_configuration(user)
 	if not doc.get("custom_purchase_type") and configuration.default_type:
 		doc.custom_purchase_type = configuration.default_type
@@ -84,9 +82,15 @@ def is_current_user_restricted() -> int:
 @frappe.whitelist()
 def get_current_user_purchase_type_configuration() -> dict:
 	"""Return only the calling user's own Purchase Type configuration."""
-	configuration = get_purchase_type_configuration(frappe.session.user)
+	return get_purchase_type_options(frappe.session.user)
+
+
+def get_purchase_type_options(user: str) -> dict:
+	"""Return the selectable types, including the standard fallback for unmapped users."""
+	configuration = get_purchase_type_configuration(user)
+	allowed_types = configuration.allowed_types or PURCHASE_TYPES
 	return {
-		"allowed_types": list(configuration.allowed_types),
+		"allowed_types": list(allowed_types),
 		"default_type": configuration.default_type,
 		"is_mapped": bool(configuration.allowed_types),
 	}

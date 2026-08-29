@@ -6,6 +6,10 @@ from frappe import _
 from frappe.utils import flt
 from frappe.model.document import Document
 
+from redtra_customisation.purchase_invoice.default_accounts import (
+	validate_default_purchase_invoice_accounts,
+)
+
 
 class RedtraCustomSetting(Document):
 	def validate(self):
@@ -14,6 +18,7 @@ class RedtraCustomSetting(Document):
 		self.validate_project_commission_slabs()
 		self.validate_purchase_type_mapping_permission()
 		self.validate_purchase_type_user_mappings()
+		validate_default_purchase_invoice_accounts(self)
 
 	def validate_purchase_type_mapping_permission(self):
 		if frappe.session.user == "Administrator":

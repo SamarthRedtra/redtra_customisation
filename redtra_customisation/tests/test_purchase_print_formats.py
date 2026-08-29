@@ -12,9 +12,12 @@ def test_supplier_invoice_template_has_required_data_sources():
 		"item.purchase_receipt",
 		"tax_amount",
 		"total_amount",
-		"{:.6f}",
+		"{:.3f}",
 		"get_letter_head_html",
 		"@page { size: A4 portrait",
+		"custom_adjustment_total",
+		"Rounding :",
+		"net_payable",
 	):
 		assert expected_value in template
 

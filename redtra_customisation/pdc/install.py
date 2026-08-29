@@ -8,11 +8,25 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from redtra_customisation.cbe.custom_fields import CBE_LINK_CUSTOM_FIELDS
 from redtra_customisation.pdc.custom_fields import PDC_CUSTOM_FIELDS
 from redtra_customisation.purchase_invoice.custom_fields import (
+	PURCHASE_INVOICE_ADJUSTMENT_CUSTOM_FIELDS,
 	PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS,
 	PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS,
 )
-from redtra_customisation.purchase_order_custom_fields import PURCHASE_ORDER_CUSTOM_FIELDS
+from redtra_customisation.purchase_invoice.adjustment import initialize_default_adjustment_account
+from redtra_customisation.purchase_invoice.auto_tax import initialize_default_purchase_invoice_tax_template
+from redtra_customisation.purchase_invoice.default_accounts import initialize_default_purchase_invoice_accounts
+from redtra_customisation.purchase_invoice_grid import (
+	apply_purchase_invoice_item_grid_defaults_to_users,
+)
+from redtra_customisation.purchase_order_custom_fields import (
+	PURCHASE_ORDER_CUSTOM_FIELDS,
+	ensure_purchase_order_discount_field_label,
+	ensure_standard_purchase_order_rate_discounts_hidden,
+)
+from redtra_customisation.purchase_order_grid import apply_purchase_order_item_grid_defaults_to_users
+from redtra_customisation.purchase_order_naming import ensure_purchase_order_naming_series
 from redtra_customisation.purchase_order_print_format import ensure_pampa_purchase_order_print_format
+from redtra_customisation.purchase_order_tax import initialize_default_purchase_order_tax_template
 from redtra_customisation.purchase_print_formats import ensure_pampa_purchase_print_formats
 from redtra_customisation.petty_cash_print_format import ensure_petty_cash_print_format
 from redtra_customisation.petty_cash_custom_fields import PETTY_CASH_LINK_CUSTOM_FIELDS
@@ -85,8 +99,14 @@ def after_install():
 	create_custom_fields(CBE_LINK_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PETTY_CASH_LINK_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PURCHASE_INVOICE_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_ORDER_CUSTOM_FIELDS, ignore_validate=True)
+	ensure_purchase_order_discount_field_label()
+	ensure_standard_purchase_order_rate_discounts_hidden()
+	ensure_purchase_order_naming_series()
+	apply_purchase_order_item_grid_defaults_to_users()
+	apply_purchase_invoice_item_grid_defaults_to_users()
 	ensure_pampa_purchase_order_print_format()
 	ensure_pampa_purchase_print_formats()
 	ensure_petty_cash_print_format()
@@ -95,6 +115,10 @@ def after_install():
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()
 	apply_settings()
+	initialize_default_adjustment_account()
+	initialize_default_purchase_invoice_tax_template()
+	initialize_default_purchase_order_tax_template()
+	initialize_default_purchase_invoice_accounts()
 	frappe.msgprint("PDC Management custom fields have been created")
 
 
@@ -104,8 +128,12 @@ def after_migrate():
 	create_custom_fields(CBE_LINK_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PETTY_CASH_LINK_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_POINT_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
+	create_custom_fields(PURCHASE_INVOICE_ADJUSTMENT_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_INVOICE_ROUNDING_CUSTOM_FIELDS, ignore_validate=True)
 	create_custom_fields(PURCHASE_ORDER_CUSTOM_FIELDS, ignore_validate=True)
+	ensure_purchase_order_discount_field_label()
+	ensure_standard_purchase_order_rate_discounts_hidden()
+	ensure_purchase_order_naming_series()
 	ensure_pampa_purchase_order_print_format()
 	ensure_pampa_purchase_print_formats()
 	ensure_petty_cash_print_format()
@@ -114,3 +142,7 @@ def after_migrate():
 	create_custom_fields(get_work_order_custom_fields(), ignore_validate=True)
 	create_property_setters()
 	apply_settings()
+	initialize_default_adjustment_account()
+	initialize_default_purchase_invoice_tax_template()
+	initialize_default_purchase_order_tax_template()
+	initialize_default_purchase_invoice_accounts()

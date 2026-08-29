@@ -2,11 +2,16 @@
 
 frappe.ui.form.on("Purchase Order", {
 	onload(frm) {
+		lock_purchase_order_naming_series(frm);
 		apply_non_stock_user_defaults(frm);
 		setup_purchase_type(frm);
 		setup_provisional_po_form(frm);
 	},
+	onload_post_render(frm) {
+		setup_purchase_type(frm);
+	},
 	refresh(frm) {
+		lock_purchase_order_naming_series(frm);
 		apply_non_stock_user_defaults(frm);
 		setup_purchase_type(frm);
 		setup_provisional_po_form(frm);
@@ -14,6 +19,19 @@ frappe.ui.form.on("Purchase Order", {
 		setup_restricted_update_items(frm);
 	},
 });
+
+function lock_purchase_order_naming_series(frm) {
+	const namingSeries = "PUR-ORD-.YYYY.-";
+	if (!frm.fields_dict.naming_series) {
+		return;
+	}
+
+	frm.set_df_property("naming_series", "options", namingSeries);
+	frm.set_df_property("naming_series", "read_only", 1);
+	if (frm.is_new() && frm.doc.naming_series !== namingSeries) {
+		frm.set_value("naming_series", namingSeries);
+	}
+}
 
 function apply_non_stock_user_defaults(frm) {
 	frappe.call({
@@ -40,10 +58,13 @@ function setup_purchase_type(frm) {
 			"redtra_customisation.override.purchase_order_permissions.get_current_user_purchase_type_configuration",
 		callback(r) {
 			const configuration = r.message || {};
-			const allowedTypes = configuration.allowed_types || ["Domestic", "International", "Admin"];
+			const allowedTypes = configuration.allowed_types?.length
+				? configuration.allowed_types
+				: ["Domestic", "International", "Admin"];
 
 			frm.set_df_property("custom_purchase_type", "options", allowedTypes.join("\n"));
 			frm.set_df_property("custom_purchase_type", "reqd", 1);
+			frm.set_df_property("custom_purchase_type", "read_only", allowedTypes.length === 1);
 
 			if (frm.is_new() && !frm.doc.custom_purchase_type && configuration.default_type) {
 				frm.set_value("custom_purchase_type", configuration.default_type);

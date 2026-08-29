@@ -88,6 +88,9 @@ frappe.ui.form.on("Purchase Invoice", {
 
 	refresh(frm) {
 		ensure_rounding_enabled(frm);
+		if (frm.doc.docstatus === 0) {
+			frm.add_custom_button(__("Set Rounding"), () => show_rounding_dialog(frm));
+		}
 	},
 
 	rounding_adjustment(frm) {
@@ -117,3 +120,25 @@ frappe.ui.form.on("Purchase Invoice", {
 		}
 	},
 });
+
+function show_rounding_dialog(frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "rounding_adjustment",
+				fieldtype: "Currency",
+				label: __("Rounding Adjustment"),
+				default: frm.doc.rounding_adjustment || 0,
+				description: __("Use a positive amount to increase, or a negative amount to reduce, the payable total."),
+			},
+		],
+		async values => {
+			await frm.set_value("disable_rounded_total", 0);
+			await frm.set_value("rounding_adjustment", values.rounding_adjustment || 0);
+			apply_manual_rounding(frm);
+			refresh_rounding_fields(frm);
+		},
+		__("Set Rounding"),
+		__("Apply")
+	);
+}

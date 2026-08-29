@@ -1,18 +1,33 @@
 {% set company = frappe.get_doc("Company", doc.company) %}
 {% set supplier = frappe.get_doc("Supplier", doc.supplier) if doc.supplier else None %}
 {% set supplier_address_name = doc.supplier_address or (supplier.supplier_primary_address if supplier else None) %}
-{% set delivery_address_name = doc.shipping_address or doc.company_address %}
+{% set company_address_names = frappe.get_all("Dynamic Link", filters={"link_doctype": "Company", "link_name": doc.company, "parenttype": "Address"}, pluck="parent") %}
+{% set preferred_company_addresses = frappe.get_all("Address", filters={"name": ["in", company_address_names], "disabled": 0}, fields=["name"], order_by="is_primary_address desc, is_shipping_address desc, modified asc", limit_page_length=1) if company_address_names else [] %}
+{% set company_address_name = preferred_company_addresses[0].name if preferred_company_addresses else None %}
+{% set delivery_address_name = doc.shipping_address or company_address_name %}
 {% set supplier_address = frappe.get_doc("Address", supplier_address_name) if supplier_address_name else None %}
 {% set delivery_address = frappe.get_doc("Address", delivery_address_name) if delivery_address_name else None %}
-{% set company_address_name = company.company_address or doc.company_address or doc.shipping_address %}
 {% set company_address = frappe.get_doc("Address", company_address_name) if company_address_name else None %}
 {% set supplier_reference = doc.get("custom_supplier_reference") or doc.get("supplier_reference") or "" %}
 {% set our_reference = doc.get("custom_our_reference") or "" %}
 {% set prepared_by = frappe.db.get_value("User", doc.owner, "full_name") or doc.owner %}
 {% set first_item = doc.items[0] if doc.items else None %}
 {% set discount_percentage = first_item.discount_percentage if first_item else 0 %}
+{% set line_discount_total = namespace(value=0) %}
+{% for item in doc.items %}
+	{% set line_discount_total.value = line_discount_total.value + (item.custom_purchase_discount_amount or 0) %}
+{% endfor %}
+{% set item_discount_total = doc.get("custom_purchase_discount_total") or line_discount_total.value %}
+{% set total_discount = (doc.discount_amount or 0) + item_discount_total %}
+{% set taxable_amount = (doc.net_total or 0) - total_discount %}
+{% set vat_total = namespace(value=0) %}
+{% for tax in doc.taxes %}
+	{% if (tax.rate or 0) and tax.add_deduct_tax != "Deduct" %}
+		{% set vat_total.value = vat_total.value + (tax.tax_amount or 0) %}
+	{% endif %}
+{% endfor %}
 
-{% macro address_lines(address) -%}
+{% macro physical_address_lines(address) -%}
 	{%- if address -%}
 		{%- if address.address_line1 -%}{{ address.address_line1 }}<br>{%- endif -%}
 		{%- if address.address_line2 -%}{{ address.address_line2 }}<br>{%- endif -%}
@@ -21,77 +36,72 @@
 		{%- if address.pincode -%}{% if address.city or address.state %} - {% endif %}{{ address.pincode }}{%- endif -%}
 		{%- if address.city or address.state or address.pincode -%}<br>{%- endif -%}
 		{%- if address.country -%}{{ address.country }}<br>{%- endif -%}
-		{%- if address.phone -%}Phone: {{ address.phone }}<br>{%- endif -%}
-		{%- if address.fax -%}Fax: {{ address.fax }}<br>{%- endif -%}
-		{%- if address.email_id -%}Email: {{ address.email_id }}{%- endif -%}
 	{%- endif -%}
 {%- endmacro %}
 
+{% macro company_contact_lines(company) -%}
+	{%- if company.phone_no -%}Tel: {{ company.phone_no }}<br>{%- endif -%}
+	{%- if company.fax -%}Fax: {{ company.fax }}<br>{%- endif -%}
+	{%- if company.email -%}E-mail: {{ company.email }}<br>{%- endif -%}
+	{%- if company.website -%}Website: {{ company.website }}<br>{%- endif -%}
+	{%- if company.tax_id -%}VAT TRN: {{ company.tax_id }}{%- endif -%}
+{%- endmacro %}
+
 <style>
-	@page { size: A4 portrait; margin: 6mm; }
+	@page { size: A4 portrait; margin: 4mm; }
 	* { box-sizing: border-box; }
-	body { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 9px; line-height: 1.2; }
+	body { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 8.5px; line-height: 1.15; }
 	.po-document { width: 100%; }
 	.po-document table { border-collapse: collapse; width: 100%; }
 	.po-document th, .po-document td { padding: 0 !important; vertical-align: top; }
-	.logo-block img { max-height: 78px; max-width: 100%; }
-	.company-details { font-size: 9.5px; font-weight: 600; line-height: 1.28; padding: 2mm 2mm 1mm 1mm; }
-	.title { font-size: 18px; font-weight: 700; text-align: center; padding: 5mm 0 3mm; }
+	.logo-block img { max-height: 58px; max-width: 100%; }
+	.company-details { font-size: 8.5px; font-weight: 600; line-height: 1.15; padding: 1mm 1mm 0; }
+	.title { font-size: 16px; font-weight: 700; text-align: center; padding: 3mm 0 2mm; }
 	.box, .meta-table, .item-table, .totals-table, .signature-box { border: 0.35mm solid #222; }
 	.meta-table th, .meta-table td, .item-table th, .item-table td, .totals-table th, .totals-table td { border: 0.25mm solid #222; }
-	.meta-table th, .meta-table td { padding: 1.5mm 2mm !important; }
-	.meta-table th { width: 47%; text-align: left; font-size: 10px; }
-	.section-row { margin-top: 3mm; }
-	.address-box { height: 48mm; padding: 3mm; }
-	.address-heading { font-size: 12px; font-weight: 700; margin-bottom: 2.5mm; }
-	.address-name { font-size: 11px; font-weight: 700; margin-bottom: 1.5mm; }
-	.address-content { font-size: 9.5px; line-height: 1.3; white-space: pre-line; }
-	.trn { margin-top: 9mm; font-size: 9.5px; }
+	.meta-table th, .meta-table td { padding: 1.2mm 1.5mm !important; }
+	.meta-table th { width: 47%; text-align: left; font-size: 9px; }
+	.section-row { margin-top: 2mm; }
+	.address-box { height: 38mm; padding: 2.5mm; }
+	.address-heading { font-size: 11px; font-weight: 700; margin-bottom: 1.5mm; }
+	.address-name { font-size: 10px; font-weight: 700; margin-bottom: 1mm; }
+	.address-content { font-size: 8.5px; line-height: 1.15; white-space: pre-line; }
+	.trn { margin-top: 5mm; font-size: 8.5px; }
 	.detail-table { margin-top: -0.35mm; }
-	.detail-table th, .detail-table td { border: 0.25mm solid #222; padding: 1.5mm 2mm !important; }
-	.detail-table th { font-size: 9px; font-weight: 400; text-align: left; }
-	.detail-table td { height: 8mm; font-size: 9px; }
-	.item-table { margin-top: 2mm; table-layout: fixed; }
-	.item-table th { border: 0.25mm solid #222; font-size: 10px; font-weight: 700; padding: 1.5mm 1mm !important; text-align: left; }
-	.item-table td { border-left: 0.25mm solid #222; border-right: 0.25mm solid #222; padding: 1.5mm 1mm !important; height: 7mm; }
+	.detail-table th, .detail-table td { border: 0.25mm solid #222; padding: 1mm 1.5mm !important; }
+	.detail-table th { font-size: 8.5px; font-weight: 400; text-align: left; }
+	.detail-table td { height: 6mm; font-size: 8.5px; }
+	.item-table { margin-top: 1.5mm; table-layout: fixed; }
+	.item-table th { border: 0.25mm solid #222; font-size: 9px; font-weight: 700; padding: 1mm 0.8mm !important; text-align: left; }
+	.item-table td { border-left: 0.25mm solid #222; border-right: 0.25mm solid #222; padding: 0.8mm !important; height: 5.5mm; }
 	.item-table .numeric { text-align: right; white-space: nowrap; }
 	.item-table .description { overflow-wrap: anywhere; }
-	.item-table .blank-row td { height: 7mm; }
-	.item-table tfoot td { border: 0.25mm solid #222; font-weight: 700; height: 7mm; }
-	.bottom-row { margin-top: 3mm; }
-	.signature-box { height: 61mm; padding: 4mm; position: relative; }
-	.signature-line { border-bottom: 0.25mm solid #222; display: inline-block; min-width: 60mm; height: 13mm; vertical-align: bottom; }
-	.signature-label { font-size: 10px; font-weight: 700; }
-	.signature-grid { margin-top: 7mm; }
-	.signature-grid td { padding: 0 0 4mm !important; }
-	.ceo-line { margin-top: 11mm; }
-	.totals-table th, .totals-table td { padding: 2mm !important; font-size: 10px; }
+	.item-table .blank-row td { height: 5.5mm; }
+	.item-table tfoot td { border: 0.25mm solid #222; font-weight: 700; height: 5.5mm; }
+	.bottom-row { margin-top: 2mm; }
+	.signature-box { height: 42mm; padding: 3mm; position: relative; }
+	.signature-line { border-bottom: 0.25mm solid #222; display: inline-block; min-width: 50mm; height: 8mm; vertical-align: bottom; }
+	.signature-label { font-size: 9px; font-weight: 700; }
+	.signature-grid { margin-top: 4mm; }
+	.signature-grid td { padding: 0 0 2mm !important; }
+	.ceo-line { margin-top: 6mm; }
+	.totals-table th, .totals-table td { padding: 1.5mm !important; font-size: 9px; }
 	.totals-table th { text-align: left; font-weight: 700; width: 55%; }
 	.totals-table td { text-align: right; white-space: nowrap; }
-	.net-payable th, .net-payable td { font-size: 12px; font-weight: 700; padding: 3mm 2mm !important; }
-	.currency { padding-right: 4mm; font-weight: 400; }
-	.footer-note { font-size: 8px; margin-top: 2mm; }
+	.net-payable th, .net-payable td { font-size: 10px; font-weight: 700; padding: 2mm 1.5mm !important; }
+	.currency { padding-right: 3mm; font-weight: 400; }
+	.footer-note { font-size: 7.5px; margin-top: 1mm; }
 </style>
 
 <div class="po-document">
 	<table>
 		<tr>
 			<td style="width: 57%;">
-				<div class="logo-block">
-					{% if letter_head %}
-						{{ letter_head }}
-					{% elif company.default_letter_head %}
-						{{ frappe.get_doc("Letter Head", company.default_letter_head).content }}
-					{% endif %}
-				</div>
+				<div class="logo-block">{{ get_letter_head_html(company.name, letter_head) }}</div>
 				<div class="company-details">
 					{{ company.company_name }}<br>
-					{% if company_address %}{{ address_lines(company_address) }}<br>{% endif %}
-					{% if company.phone_no %}Tel: {{ company.phone_no }}<br>{% endif %}
-					{% if company.fax %}Fax: {{ company.fax }}<br>{% endif %}
-					{% if company.email %}E-mail: {{ company.email }}<br>{% endif %}
-					{% if company.website %}Website: {{ company.website }}<br>{% endif %}
-					{% if company.tax_id %}VAT TRN: {{ company.tax_id }}{% endif %}
+					{% if company_address %}{{ physical_address_lines(company_address) }}{% endif %}
+					{{ company_contact_lines(company) }}
 				</div>
 			</td>
 			<td style="width: 43%;">
@@ -111,14 +121,14 @@
 				<div class="box address-box">
 					<div class="address-heading">Supplier:</div>
 					<div class="address-name">{{ doc.supplier_name or doc.supplier }}</div>
-					<div class="address-content">{{ address_lines(supplier_address) }}</div>
+					<div class="address-content">{{ physical_address_lines(supplier_address) }}</div>
 					<div class="trn">TRN &nbsp;&nbsp;&nbsp;&nbsp; {{ supplier.tax_id if supplier and supplier.tax_id else "" }}</div>
 				</div>
 			</td>
 			<td style="width: 43%; padding-left: 2mm;">
 				<div class="box address-box">
 					<div class="address-heading">Deliver to</div>
-					<div class="address-content">{{ address_lines(delivery_address) }}</div>
+					<div class="address-content">{{ physical_address_lines(delivery_address) }}</div>
 				</div>
 			</td>
 		</tr>
@@ -157,19 +167,21 @@
 		</thead>
 		<tbody>
 			{% for item in doc.items %}
-				{% set line_tax = item.get("tax_amount") or 0 %}
-				{% set line_total = item.get("total_amount") or ((item.amount or 0) + line_tax) %}
+				{% set line_discount = item.custom_purchase_discount_amount or 0 %}
+				{% set line_taxable = (item.amount or 0) - line_discount %}
+				{% set line_tax = ((line_taxable / taxable_amount) * vat_total.value) if taxable_amount else 0 %}
+				{% set line_total = line_taxable + line_tax %}
 				<tr>
 					<td>{{ item.item_code or "" }}</td>
 					<td class="description">{{ frappe.utils.strip_html(item.description or item.item_name or "") }}</td>
 					<td>{{ item.uom or item.stock_uom or "" }}</td>
 					<td class="numeric">{{ frappe.format_value(item.qty, {"fieldtype": "Float", "precision": item.precision("qty")}) }}</td>
-					<td class="numeric">{{ "{:.6f}".format(item.rate or 0) }}</td>
-					<td class="numeric">{{ "{:.6f}".format(line_tax) }}</td>
-					<td class="numeric">{{ "{:.6f}".format(line_total) }}</td>
+					<td class="numeric">{{ "{:.3f}".format(item.rate or 0) }}</td>
+					<td class="numeric">{{ "{:.3f}".format(line_tax) }}</td>
+					<td class="numeric">{{ "{:.3f}".format(line_total) }}</td>
 				</tr>
 			{% endfor %}
-			{% for unused_row in range([10 - (doc.items | length), 0] | max) %}
+			{% for unused_row in range([8 - (doc.items | length), 0] | max) %}
 				<tr class="blank-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 			{% endfor %}
 		</tbody>
@@ -178,7 +190,7 @@
 				<td>Total</td><td></td><td></td>
 				<td class="numeric">{{ frappe.format_value(doc.total_qty, {"fieldtype": "Float", "precision": doc.precision("total_qty")}) }}</td>
 				<td></td>
-				<td class="numeric">{{ "{:.6f}".format(doc.total_taxes_and_charges or 0) }}</td>
+				<td class="numeric">{{ "{:.3f}".format(vat_total.value) }}</td>
 				<td></td>
 			</tr>
 		</tfoot>
@@ -203,11 +215,11 @@
 			</td>
 			<td style="width: 36%; padding-left: 2mm;">
 				<table class="totals-table">
-					<tr><th>Sub Total:</th><td>{{ "{:.6f}".format(doc.net_total or 0) }}</td></tr>
-					<tr><th>Discount:</th><td>{{ "{:.6f}".format(doc.discount_amount or 0) }}</td></tr>
-					<tr><th>Taxable:</th><td>{{ "{:.6f}".format(doc.net_total or 0) }}</td></tr>
-					<tr><th>VAT@5%:</th><td>{{ "{:.6f}".format(doc.total_taxes_and_charges or 0) }}</td></tr>
-					<tr class="net-payable"><th>Net Payable:</th><td><span class="currency">{{ doc.currency }}</span>{{ "{:.6f}".format(doc.grand_total or 0) }}</td></tr>
+					<tr><th>Sub Total:</th><td>{{ "{:.3f}".format(doc.net_total or 0) }}</td></tr>
+					<tr><th>Discount:</th><td>{{ "{:.3f}".format(total_discount) }}</td></tr>
+					<tr><th>Taxable:</th><td>{{ "{:.3f}".format(taxable_amount) }}</td></tr>
+					<tr><th>VAT@5%:</th><td>{{ "{:.3f}".format(vat_total.value) }}</td></tr>
+					<tr class="net-payable"><th>Net Payable:</th><td><span class="currency">{{ doc.currency }}</span>{{ "{:.3f}".format(doc.grand_total or 0) }}</td></tr>
 				</table>
 			</td>
 		</tr>

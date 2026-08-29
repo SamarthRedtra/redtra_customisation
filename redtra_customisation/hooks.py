@@ -63,10 +63,18 @@ doctype_js = {
 	"Shift Type": "rhr/doctype/shift_type/shift_type.js",
 	"Post Dated Cheques Tool": "redtra_customisation/doctype/post_dated_cheques_tool/post_dated_cheques_tool.js",
 	"Post Dated Cheques": "redtra_customisation/doctype/post_dated_cheques/post_dated_cheques.js",
-	"Purchase Order": "public/js/purchase_order_nonstock.js",
+	"Purchase Order": [
+		"public/js/purchase_order_nonstock.js",
+		"public/js/purchase_order_discount.js",
+		"public/js/purchase_order_auto_tax.js",
+	],
 	"Purchase Invoice": [
 		"public/js/purchase_invoice_expense_account.js",
+		"public/js/purchase_invoice_grid.js",
 		"public/js/purchase_invoice_rounding.js",
+		"public/js/purchase_invoice_discount.js",
+		"public/js/purchase_invoice_adjustment.js",
+		"public/js/purchase_invoice_auto_tax.js",
 	],
 	"Stock Entry": "public/js/stock_entry_item_conversion.js",
 	"Item": "public/js/item_expense_account.js",
@@ -192,11 +200,21 @@ doc_events = {
 	},
  "Purchase Order": {
     "before_insert": [
+        "redtra_customisation.purchase_order_naming.set_purchase_order_naming_series",
         "redtra_customisation.override.purchase_order_permissions.set_default_is_nonstock",
         "redtra_customisation.override.purchase_order_permissions.set_purchase_type_defaults",
         "redtra_customisation.override.provisional_purchase_order.set_default_provisional_po",
     ],
-    "validate": "redtra_customisation.override.purchase_order_permissions.validate_non_stock_user_po",
+    "before_validate": [
+        "redtra_customisation.override.purchase_order_permissions.set_purchase_type_defaults",
+		"redtra_customisation.purchase_order_tax.apply_default_purchase_order_tax_template",
+        "redtra_customisation.purchase_item_discount.sync_purchase_order_item_discounts",
+    ],
+    "validate": [
+        "redtra_customisation.purchase_order_naming.validate_purchase_order_naming_series",
+        "redtra_customisation.override.purchase_order_permissions.validate_non_stock_user_po",
+        "redtra_customisation.purchase_item_discount.validate_item_discounts",
+    ],
     "on_update": "redtra_customisation.override.purchase_order.on_update_po"
  },
  "Purchase Order Item": {

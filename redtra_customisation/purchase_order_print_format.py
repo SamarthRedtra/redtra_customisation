@@ -10,6 +10,7 @@ from redtra_customisation.purchase_order_custom_fields import PURCHASE_ORDER_CUS
 
 PRINT_FORMAT_NAME = "PO Default 1"
 TEMPLATE_PATH = ("templates", "print_formats", "pampa_purchase_order.html")
+DEFAULT_PRINT_FORMAT_PROPERTY_SETTER = "Purchase Order-main-default_print_format"
 
 
 def get_pampa_purchase_order_html():
@@ -31,10 +32,10 @@ def ensure_pampa_purchase_order_print_format():
 		"print_format_type": "Jinja",
 		"pdf_generator": "wkhtmltopdf",
 		"page_number": "Bottom Right",
-		"margin_top": 6.0,
-		"margin_bottom": 6.0,
-		"margin_left": 6.0,
-		"margin_right": 6.0,
+		"margin_top": 4.0,
+		"margin_bottom": 4.0,
+		"margin_left": 4.0,
+		"margin_right": 4.0,
 		"font_size": 9,
 		"disabled": 0,
 		"raw_printing": 0,
@@ -54,4 +55,29 @@ def ensure_pampa_purchase_order_print_format():
 		print_format = frappe.get_doc({"doctype": "Print Format", "name": PRINT_FORMAT_NAME, **values})
 		print_format.insert(ignore_permissions=True)
 
+	ensure_pampa_purchase_order_default_print_format()
 	frappe.clear_cache(doctype="Print Format")
+
+
+def ensure_pampa_purchase_order_default_print_format():
+	"""Keep the approved Pampa format as the Purchase Order default after migration."""
+	if frappe.db.exists("Property Setter", DEFAULT_PRINT_FORMAT_PROPERTY_SETTER):
+		property_setter = frappe.get_doc("Property Setter", DEFAULT_PRINT_FORMAT_PROPERTY_SETTER)
+		if property_setter.value != PRINT_FORMAT_NAME:
+			property_setter.value = PRINT_FORMAT_NAME
+			property_setter.save(ignore_permissions=True)
+	else:
+		frappe.get_doc(
+			{
+				"doctype": "Property Setter",
+				"name": DEFAULT_PRINT_FORMAT_PROPERTY_SETTER,
+				"doctype_or_field": "DocType",
+				"doc_type": "Purchase Order",
+				"property": "default_print_format",
+				"property_type": "Data",
+				"value": PRINT_FORMAT_NAME,
+				"is_system_generated": 1,
+			}
+		).insert(ignore_permissions=True)
+
+	frappe.clear_cache(doctype="Purchase Order")

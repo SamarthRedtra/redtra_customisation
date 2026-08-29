@@ -4,8 +4,10 @@ import frappe
 from frappe.tests import UnitTestCase
 
 from redtra_customisation.override.purchase_order_permissions import (
+	PURCHASE_TYPES,
 	get_permission_query_conditions,
 	get_purchase_type_configuration,
+	get_purchase_type_options,
 	has_permission,
 	is_restricted_non_stock_user,
 )
@@ -66,6 +68,15 @@ class TestPurchaseOrderPermissions(UnitTestCase):
 			user=user,
 		)
 		self.assertTrue(result)
+
+	def test_unmapped_user_has_all_purchase_types_available(self):
+		user = "_test_po_unmapped@example.com"
+		self._ensure_user(user, restricted=False)
+		self._set_purchase_type_mappings([])
+
+		self.assertEqual(get_purchase_type_configuration(user).allowed_types, ())
+		self.assertEqual(get_purchase_type_options(user)["allowed_types"], list(PURCHASE_TYPES))
+		self.assertFalse(get_purchase_type_options(user)["is_mapped"])
 
 	def test_mapped_user_can_only_access_own_purchase_orders(self):
 		user = "_test_po_purchase_type@example.com"

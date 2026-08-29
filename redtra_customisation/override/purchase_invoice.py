@@ -16,15 +16,35 @@ from redtra_customisation.override.purchase_invoice_rounding import (
 	has_manual_rounding,
 	preserve_manual_rounding,
 )
+from redtra_customisation.purchase_invoice.adjustment import (
+	configure_adjusted_tax_base,
+	normalize_purchase_invoice_adjustments,
+	sync_item_adjustments,
+	validate_purchase_invoice_adjustments,
+)
+from redtra_customisation.purchase_invoice.auto_tax import apply_default_purchase_invoice_tax_template
+from redtra_customisation.purchase_item_discount import (
+	reindex_tax_rows,
+	sync_item_discounts,
+	validate_item_discounts,
+)
 
 
 class CustomPurchaseInvoice(PurchaseInvoice):
+	def before_validate(self):
+		apply_default_purchase_invoice_tax_template(self)
+
 	def is_rounded_total_disabled(self):
 		if has_manual_rounding(self):
 			return False
 		return super().is_rounded_total_disabled()
 
 	def calculate_taxes_and_totals(self):
+		sync_item_discounts(self)
+		sync_item_adjustments(self)
+		normalize_purchase_invoice_adjustments(self)
+		configure_adjusted_tax_base(self)
+		reindex_tax_rows(self)
 		manual_rounding = flt(self.rounding_adjustment) if flt(self.rounding_adjustment) else None
 		manual_rounded = (
 			flt(self.rounded_total)
@@ -48,6 +68,8 @@ class CustomPurchaseInvoice(PurchaseInvoice):
 
 	def validate(self):
 		super().validate()
+		validate_item_discounts(self)
+		validate_purchase_invoice_adjustments(self)
 
 	def get_gl_entries(self, inventory_account_map=None):
 		gl_entries = super().get_gl_entries(inventory_account_map)
