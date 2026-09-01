@@ -5,6 +5,7 @@ from frappe import _
 from frappe.utils import cint, flt
 
 from redtra_customisation.patches.v16_0.opening_sales_invoice_date_map import INVOICE_DATE_MAP
+from redtra_customisation.patches.v16_0.sales_invoice_date_utils import dates_match
 
 
 COMPANY = "Deltachem Middle East LLC"
@@ -93,13 +94,13 @@ def _validate_invoice(invoice):
 	if frappe.db.count("Payment Schedule", {"parenttype": "Sales Invoice", "parent": invoice.name}):
 		_raise_unexpected(invoice.name, "payment schedule rows")
 
-	is_correct = _dates_match(invoice.posting_date, invoice.due_date, posting_date, due_date)
-	is_pending = _dates_match(invoice.posting_date, invoice.due_date, SOURCE_POSTING_DATE, SOURCE_DUE_DATE)
+	is_correct = dates_match(invoice.posting_date, invoice.due_date, posting_date, due_date)
+	is_pending = dates_match(invoice.posting_date, invoice.due_date, SOURCE_POSTING_DATE, SOURCE_DUE_DATE)
 	if not is_correct and not is_pending:
 		_raise_unexpected(invoice.name, "invoice dates")
 
 	payment_ledger_entry = _get_payment_ledger_entry(invoice.name)
-	if not _dates_match(
+	if not dates_match(
 		payment_ledger_entry.posting_date,
 		payment_ledger_entry.due_date,
 		posting_date if is_correct else SOURCE_POSTING_DATE,
@@ -210,10 +211,6 @@ def _verify_correction():
 	records = _preflight()
 	if any(not record["is_correct"] for record in records):
 		frappe.throw(_("Opening Sales Invoice correction did not complete."))
-
-
-def _dates_match(actual_posting_date, actual_due_date, expected_posting_date, expected_due_date):
-	return str(actual_posting_date) == expected_posting_date and str(actual_due_date) == expected_due_date
 
 
 def _raise_unexpected(invoice_name, condition):

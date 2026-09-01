@@ -23,6 +23,18 @@ function enableItemConversionRate(frm, cdt, cdn) {
 	if (!row?.item_code) return;
 
 	frappe.model.set_value(cdt, cdn, 'set_basic_rate_manually', 1);
+	syncItemConversionLineAmount(frm, cdt, cdn);
+}
+
+function syncItemConversionLineAmount(frm, cdt, cdn) {
+	if (!isItemConversion(frm)) return;
+
+	const row = locals[cdt]?.[cdn];
+	if (!row?.t_warehouse || row.s_warehouse) return;
+
+	const basic_amount = flt(row.transfer_qty) * flt(row.basic_rate);
+	frappe.model.set_value(cdt, cdn, 'basic_amount', basic_amount);
+	frappe.model.set_value(cdt, cdn, 'amount', basic_amount);
 }
 
 function enableItemConversionRates(frm) {
@@ -72,5 +84,17 @@ frappe.ui.form.on('Stock Entry Detail', {
 
 	t_warehouse(frm, cdt, cdn) {
 		enableItemConversionRate(frm, cdt, cdn);
+	},
+
+	basic_rate(frm, cdt, cdn) {
+		syncItemConversionLineAmount(frm, cdt, cdn);
+	},
+
+	qty(frm, cdt, cdn) {
+		syncItemConversionLineAmount(frm, cdt, cdn);
+	},
+
+	transfer_qty(frm, cdt, cdn) {
+		syncItemConversionLineAmount(frm, cdt, cdn);
 	}
 });

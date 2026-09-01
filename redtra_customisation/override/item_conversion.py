@@ -7,6 +7,8 @@ from frappe.utils import flt
 
 ITEM_CONVERSION_TYPE = "Item Conversion / Dismantling"
 ITEM_CONVERSION_PURPOSE = "Material Transfer"
+# Ignore small split/rounding gaps when dismantling one value into multiple items.
+ITEM_CONVERSION_ROUNDING_TOLERANCE = 1.0
 
 
 def is_item_conversion(doc):
@@ -31,10 +33,32 @@ def validate_item_conversion_entry(doc, method=None):
 		return
 
 	precision = doc.precision("value_difference") or 2
-	tolerance = 1 / (10**precision)
-	if abs(flt(doc.value_difference, precision)) >= tolerance:
+	source_value, output_value = get_item_conversion_totals(doc)
+	difference = flt(output_value - source_value, precision)
+
+	if abs(difference) > ITEM_CONVERSION_ROUNDING_TOLERANCE:
 		frappe.throw(
 			_(
-				"Total output valuation must equal total source valuation. Distribute the conversion value across the output items."
-			)
+				"Total output valuation must equal total source valuation. "
+				"Source: {0}, Output: {1}, Difference: {2}. "
+				"Distribute the source value across output item Basic Rate fields."
+			).format(source_value, output_value, difference)
 		)
+
+
+def get_item_conversion_totals(doc):
+	"""Return source and output valuation totals for an item-conversion entry."""
+	source_value = 0.0
+	output_value = 0.0
+
+	for item in doc.get("items"):
+		line_value = flt(item.basic_amount) or flt(item.amount)
+		if item.s_warehouse and not item.t_warehouse:
+			source_value += line_value
+		elif item.t_warehouse and not item.s_warehouse:
+			output_value += line_value
+
+	return (
+		flt(source_value, doc.precision("total_outgoing_value") or 2),
+		flt(output_value, doc.precision("total_incoming_value") or 2),
+	)
