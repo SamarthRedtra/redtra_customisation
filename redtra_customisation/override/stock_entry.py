@@ -35,6 +35,13 @@ class CustomStockEntry(StockEntry):
 			frappe.throw(_("Item Conversion / Dismantling requires at least one Target Warehouse row."))
 
 		for item in self.items:
+			if item.s_warehouse and item.t_warehouse:
+				frappe.throw(
+					_(
+						"Row {0}: use Source Warehouse for the dismantled item or Target Warehouse for output items, not both."
+					).format(item.idx)
+				)
+
 			if not item.s_warehouse and not item.t_warehouse:
 				frappe.throw(_("Row {0}: select a Source Warehouse or Target Warehouse.").format(item.idx))
 

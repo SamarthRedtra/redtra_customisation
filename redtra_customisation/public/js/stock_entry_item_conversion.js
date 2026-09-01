@@ -31,6 +31,21 @@ function enableItemConversionRates(frm) {
 	});
 }
 
+function validateItemConversionWarehouses(frm) {
+	if (!isItemConversion(frm)) return;
+
+	(frm.doc.items || []).forEach((row) => {
+		if (row.s_warehouse && row.t_warehouse) {
+			frappe.throw(
+				__(
+					'Row {0}: use Source Warehouse for the dismantled item or Target Warehouse for output items, not both.',
+					[row.idx]
+				)
+			);
+		}
+	});
+}
+
 frappe.ui.form.on('Stock Entry', {
 	refresh(frm) {
 		configureItemConversionGrid(frm);
@@ -39,6 +54,10 @@ frappe.ui.form.on('Stock Entry', {
 	stock_entry_type(frm) {
 		configureItemConversionGrid(frm);
 		enableItemConversionRates(frm);
+	},
+
+	validate(frm) {
+		validateItemConversionWarehouses(frm);
 	}
 });
 
