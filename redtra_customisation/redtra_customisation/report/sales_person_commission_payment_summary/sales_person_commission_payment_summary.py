@@ -4,6 +4,7 @@
 import frappe
 from frappe import _, msgprint, qb
 from frappe.query_builder import Criterion
+from frappe.utils import flt
 
 
 ALLOWED_DOCTYPES = {
@@ -125,6 +126,24 @@ def get_columns(filters):
 			"width": 140,
 		},
 		{
+			"label": _("Paid Amount"),
+			"fieldname": "paid_amount",
+			"fieldtype": "Currency",
+			"width": 140,
+		},
+		{
+			"label": _("Extra Paid"),
+			"fieldname": "extra_paid_amount",
+			"fieldtype": "Currency",
+			"width": 140,
+		},
+		{
+			"label": _("Outstanding Amount"),
+			"fieldname": "outstanding_amount",
+			"fieldtype": "Currency",
+			"width": 140,
+		},
+		{
 			"label": _("Create Payment Entry"),
 			"fieldname": "create_payment_entry",
 			"fieldtype": "Data",
@@ -176,22 +195,45 @@ def get_entries(filters):
 	for entry in entries:
 		entry.source_doctype = filters["doc_type"]
 		entry.create_payment_entry = ""
+		entry.paid_amount = 0
+		entry.extra_paid_amount = 0
+		entry.outstanding_amount = flt(entry.get("commission_amount"))
 		entry.commission_paid = 0
 		if filters["doc_type"] == "Sales Invoice" and entry.get("source_name") and entry.get("project"):
-			entry.commission_paid = 1 if _is_sales_invoice_commission_paid(
-				entry.source_name, entry.project
-			) else 0
+			payment_status = _get_sales_invoice_commission_payment_status(entry)
+			entry.paid_amount = payment_status["paid_amount"]
+			entry.extra_paid_amount = payment_status["extra_paid_amount"]
+			entry.outstanding_amount = payment_status["outstanding_amount"]
+			entry.commission_paid = 1 if payment_status["commission_paid"] else 0
 
 	return entries
 
 
-def _is_sales_invoice_commission_paid(invoice_no: str, project: str) -> bool:
+def _get_sales_invoice_commission_payment_status(entry: dict) -> dict:
 	try:
-		from construction_management.api.project_commission_data import (
-			_get_paid_out_commission_invoices,
-		)
+		from construction_management.api.project_commission_data import get_commission_payment_status
 
-		return invoice_no in _get_paid_out_commission_invoices(project)
+		return get_commission_payment_status(
+			entry.get("source_name"),
+			entry.get("project"),
+			entry.get("company"),
+			flt(entry.get("commission_amount")),
+		)
+	except ImportError:
+		return {
+			"paid_amount": 0,
+			"extra_paid_amount": 0,
+			"outstanding_amount": flt(entry.get("commission_amount")),
+			"commission_paid": False,
+		}
+
+
+def _is_sales_invoice_commission_paid(invoice_no: str, project: str, company: str | None = None, commission_amount: float = 0) -> bool:
+	try:
+		from construction_management.api.project_commission_data import get_commission_payment_status
+
+		status = get_commission_payment_status(invoice_no, project, company, commission_amount)
+		return status["commission_paid"]
 	except ImportError:
 		return False
 

@@ -39,19 +39,19 @@ function ensure_redtra_commission_pe_button_styles() {
 }
 
 function get_sales_person_payment_entry_route_options(row) {
-	const commission_amount = flt(row.commission_amount || 0);
+	const outstanding_amount = flt(row.outstanding_amount || 0);
 	const source_name = row.source_name || "";
 	const route_options = {
 		payment_type: "Pay",
 		party_type: "Employee",
 		party: row.employee,
 		company: row.company,
-		paid_amount: commission_amount,
-		received_amount: commission_amount,
+		paid_amount: outstanding_amount,
+		received_amount: outstanding_amount,
 		remarks: `Commission payout for Sales Invoice ${source_name}`,
 		custom_remarks: 1,
 		custom_is_commission_payout: 1,
-		reference_no: source_name,
+		custom_commission_sales_invoice: source_name,
 	};
 
 	if (row.project) {
@@ -150,6 +150,13 @@ frappe.query_reports["Sales Person Commission Payment Summary"] = {
 			}
 
 			if (cint(data.commission_paid)) {
+				if (flt(data.extra_paid_amount) > 0) {
+					return `<span class="text-muted">${__("Paid")}</span><br><small style="color:#c05621;">${__("Extra")}: ${frappe.format(data.extra_paid_amount, { fieldtype: "Currency" })}</small>`;
+				}
+				return `<span class="text-muted">${__("Paid")}</span>`;
+			}
+
+			if (!flt(data.outstanding_amount)) {
 				return `<span class="text-muted">${__("Paid")}</span>`;
 			}
 
