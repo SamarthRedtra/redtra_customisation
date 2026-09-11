@@ -264,10 +264,6 @@ override_whitelisted_methods = {
 	"frappe.www.printview.get_rendered_raw_commands": (
 		"redtra_customisation.override.printview.get_rendered_raw_commands"
 	),
-	# ERPNext v17 moved PR -> PI mapper out of purchase_receipt.py.
-	"erpnext.stock.doctype.purchase_receipt.purchase_receipt.make_purchase_invoice": (
-		"erpnext.stock.doctype.purchase_receipt.mapper.make_purchase_invoice"
-	),
 	# open_mapped_doc sends selected_children as {} when no child rows are checked.
 	"frappe.model.mapper.make_mapped_doc": (
 		"redtra_customisation.override.mapper.make_mapped_doc"
