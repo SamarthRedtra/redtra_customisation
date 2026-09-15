@@ -120,8 +120,8 @@ class PostDatedCheques(Document):
 				)
 
 		for (reference_doctype, reference_name), total_allocated in allocated_in_doc.items():
-			outstanding = flt(
-				frappe.db.get_value(reference_doctype, reference_name, "outstanding_amount")
+			outstanding = get_primary_invoice_outstanding(
+				reference_doctype, reference_name
 			)
 			if total_allocated > outstanding + 0.01:
 				frappe.throw(
@@ -230,6 +230,70 @@ def _effective_pdc_line_allocation(allocated_amount, parent_pdc_amount, parent_t
 	return allocated_amount
 
 
+def _invoice_party_account_fields(reference_doctype):
+	if reference_doctype == "Sales Invoice":
+		return "debit_to", "customer", "Customer"
+	if reference_doctype == "Purchase Invoice":
+		return "credit_to", "supplier", "Supplier"
+	frappe.throw(_("Invalid invoice doctype"))
+
+
+def _primary_outstanding_sql(reference_doctype, invoice_alias="inv"):
+	account_field, party_field, party_type = _invoice_party_account_fields(
+		reference_doctype
+	)
+	return f"""
+		COALESCE((
+			SELECT SUM(ple.amount_in_account_currency)
+			FROM `tabPayment Ledger Entry` ple
+			WHERE ple.against_voucher_type = '{reference_doctype}'
+				AND ple.against_voucher_no = {invoice_alias}.name
+				AND ple.account = {invoice_alias}.{account_field}
+				AND ple.party_type = '{party_type}'
+				AND ple.party = {invoice_alias}.{party_field}
+				AND ple.delinked = 0
+		), {invoice_alias}.outstanding_amount, 0)
+	"""
+
+
+def get_primary_invoice_outstanding(reference_doctype, reference_name):
+	"""Outstanding on the invoice's main Debtors/Creditors account only."""
+	account_field, party_field, party_type = _invoice_party_account_fields(
+		reference_doctype
+	)
+	details = frappe.db.get_value(
+		reference_doctype,
+		reference_name,
+		[account_field, party_field, "outstanding_amount"],
+		as_dict=True,
+	)
+	if not details:
+		return 0.0
+
+	ledger_outstanding = frappe.db.sql(
+		"""
+		SELECT SUM(amount_in_account_currency)
+		FROM `tabPayment Ledger Entry`
+		WHERE against_voucher_type = %(reference_doctype)s
+			AND against_voucher_no = %(reference_name)s
+			AND account = %(account)s
+			AND party_type = %(party_type)s
+			AND party = %(party)s
+			AND delinked = 0
+		""",
+		{
+			"reference_doctype": reference_doctype,
+			"reference_name": reference_name,
+			"account": details.get(account_field),
+			"party_type": party_type,
+			"party": details.get(party_field),
+		},
+	)[0][0]
+	if ledger_outstanding is None:
+		return max(0.0, flt(details.outstanding_amount))
+	return max(0.0, flt(ledger_outstanding))
+
+
 def get_active_pdc_allocated_amount(reference_doctype, reference_name, exclude_pdc=None):
 	"""Effective amount reserved on active PDCs (capped by each PDC cheque amount)."""
 	filters = {
@@ -295,9 +359,7 @@ def get_active_pdc_allocated_amount(reference_doctype, reference_name, exclude_p
 
 def get_remaining_pdc_allocatable(reference_doctype, reference_name, exclude_pdc=None):
 	"""Outstanding invoice amount not yet reserved on other active PDCs."""
-	outstanding = flt(
-		frappe.db.get_value(reference_doctype, reference_name, "outstanding_amount")
-	)
+	outstanding = get_primary_invoice_outstanding(reference_doctype, reference_name)
 	already_allocated = get_active_pdc_allocated_amount(
 		reference_doctype, reference_name, exclude_pdc=exclude_pdc
 	)
@@ -350,31 +412,32 @@ def search_purchase_invoice_for_pdc(doctype, txt, searchfield, start, page_len, 
 	start = int(start) if start else 0
 	search_txt = (txt or "").strip()
 
-	query = """
+	outstanding_expr = _primary_outstanding_sql("Purchase Invoice")
+	query = f"""
 		SELECT
-			name,
-			COALESCE(custom_supplier_invoice_no, '') AS custom_supplier_invoice_no,
-			grand_total,
-			outstanding_amount
-		FROM `tabPurchase Invoice`
-		WHERE docstatus = 1
-			AND company = %(company)s
-			AND supplier = %(supplier)s
-			AND outstanding_amount > 0
+			inv.name,
+			COALESCE(inv.custom_supplier_invoice_no, '') AS custom_supplier_invoice_no,
+			inv.grand_total,
+			{outstanding_expr} AS outstanding_amount
+		FROM `tabPurchase Invoice` inv
+		WHERE inv.docstatus = 1
+			AND inv.company = %(company)s
+			AND inv.supplier = %(supplier)s
+			AND {outstanding_expr} > 0.009
 	"""
 	values = {"company": company, "supplier": supplier}
 
 	if search_txt:
 		query += """
 			AND (
-				name LIKE %(txt)s
-				OR custom_supplier_invoice_no LIKE %(txt)s
+				inv.name LIKE %(txt)s
+				OR inv.custom_supplier_invoice_no LIKE %(txt)s
 			)
 		"""
 		values["txt"] = f"%{search_txt}%"
 
 	query += """
-		ORDER BY posting_date DESC, name DESC
+		ORDER BY inv.posting_date DESC, inv.name DESC
 		LIMIT %(start)s, %(page_len)s
 	"""
 	values["start"] = start
@@ -417,6 +480,7 @@ def search_invoice_for_pdc(doctype, txt, searchfield, start, page_len, filters):
 	}
 
 	allocation_subquery = _active_pdc_allocation_subquery()
+	outstanding_expr = _primary_outstanding_sql(reference_doctype)
 
 	query = f"""
 		SELECT
@@ -424,14 +488,14 @@ def search_invoice_for_pdc(doctype, txt, searchfield, start, page_len, filters):
 			{supplier_invoice_expr if reference_doctype == "Purchase Invoice" else "''"} AS custom_supplier_invoice_no,
 			{customer_invoice_expr if reference_doctype == "Sales Invoice" else "''"} AS custom_customer_invoice_no,
 			inv.grand_total,
-			inv.outstanding_amount,
-			(inv.outstanding_amount - {allocation_subquery}) AS remaining_allocatable
+			{outstanding_expr} AS outstanding_amount,
+			({outstanding_expr} - {allocation_subquery}) AS remaining_allocatable
 		FROM `tab{reference_doctype}` inv
 		WHERE inv.docstatus = 1
 			AND inv.company = %(company)s
 			AND inv.{party_field} = %(party)s
-			AND inv.outstanding_amount > 0
-			AND (inv.outstanding_amount - {allocation_subquery}) > 0.009
+			AND {outstanding_expr} > 0.009
+			AND ({outstanding_expr} - {allocation_subquery}) > 0.009
 	"""
 	values["reference_doctype"] = reference_doctype
 
@@ -480,7 +544,6 @@ def get_pdc_invoice_details(reference_doctype, invoices, current_pdc=None):
 		filters={
 			"name": ["in", invoices],
 			"docstatus": 1,
-			"outstanding_amount": [">", 0],
 		},
 		fields=fields,
 		order_by="posting_date desc, name desc",
@@ -488,6 +551,9 @@ def get_pdc_invoice_details(reference_doctype, invoices, current_pdc=None):
 
 	result = []
 	for row in rows:
+		row["outstanding_amount"] = get_primary_invoice_outstanding(
+			reference_doctype, row.name
+		)
 		remaining = get_remaining_pdc_allocatable(
 			reference_doctype,
 			row.name,
@@ -516,32 +582,9 @@ def get_pending_invoices(company, party_type, party, current_pdc=None):
 	reference_doctype = "Sales Invoice" if party_type == "Customer" else "Purchase Invoice"
 	party_field = "customer" if party_type == "Customer" else "supplier"
 
-	# Only lock based on SUBMITTED post dated cheques
-	allocation_subquery = """
-		COALESCE((
-			SELECT SUM(
-				CASE
-					WHEN pdc_totals.total_alloc > IFNULL(pdc.amount, 0)
-						AND pdc_totals.total_alloc > 0
-						AND IFNULL(pdc.amount, 0) > 0
-					THEN ref.allocated_amount * pdc.amount / pdc_totals.total_alloc
-					ELSE ref.allocated_amount
-				END
-			)
-			FROM `tabPDC Invoice Reference` ref
-			INNER JOIN `tabPost Dated Cheques` pdc ON pdc.name = ref.parent
-			INNER JOIN (
-				SELECT parent, SUM(allocated_amount) AS total_alloc
-				FROM `tabPDC Invoice Reference`
-				GROUP BY parent
-			) pdc_totals ON pdc_totals.parent = ref.parent
-			WHERE ref.reference_doctype = %(reference_doctype)s
-				AND ref.reference_name = inv.name
-				AND pdc.docstatus = 1
-				AND IFNULL(pdc.status, '') != 'Cancelled'
-				AND (%(current_pdc)s = '' OR pdc.name != %(current_pdc)s)
-		), 0)
-	"""
+	# Only lock based on submitted Post Dated Cheques.
+	allocation_subquery = _active_pdc_allocation_subquery()
+	outstanding_expr = _primary_outstanding_sql(reference_doctype)
 
 	supplier_invoice_expr = "COALESCE(inv.custom_supplier_invoice_no, '')"
 	customer_invoice_expr = "COALESCE(inv.bill_no, '')"
@@ -552,13 +595,13 @@ def get_pending_invoices(company, party_type, party, current_pdc=None):
 			{supplier_invoice_expr if reference_doctype == "Purchase Invoice" else "''"} AS custom_supplier_invoice_no,
 			{customer_invoice_expr if reference_doctype == "Sales Invoice" else "''"} AS custom_customer_invoice_no,
 			inv.grand_total,
-			inv.outstanding_amount,
-			(inv.outstanding_amount - {allocation_subquery}) AS remaining_allocatable
+			{outstanding_expr} AS outstanding_amount,
+			({outstanding_expr} - {allocation_subquery}) AS remaining_allocatable
 		FROM `tab{reference_doctype}` inv
 		WHERE inv.docstatus = 1
 			AND inv.company = %(company)s
 			AND inv.{party_field} = %(party)s
-			AND inv.outstanding_amount > 0
+			AND {outstanding_expr} > 0.009
 		ORDER BY inv.posting_date DESC, inv.name DESC
 	"""
 
