@@ -39,14 +39,25 @@ def is_provisional_po(purchase_order: str) -> bool:
 	if not purchase_order:
 		return False
 
-	settings = get_provisional_settings()
-	if not settings["enabled"]:
+	meta = frappe.get_meta("Purchase Order")
+	if not meta.has_field("custom_is_provisional_po"):
 		return False
 
-	if not frappe.get_meta("Purchase Order").has_field("custom_is_provisional_po"):
+	fields = ["custom_is_provisional_po"]
+	if meta.has_field("controlled_procurement") and meta.has_field("custom_lpo_type"):
+		fields.extend(["controlled_procurement", "custom_lpo_type"])
+	po = frappe.db.get_value(
+		"Purchase Order", purchase_order,
+		fields,
+		as_dict=True,
+	)
+	if po and not isinstance(po, dict):
+		po = frappe._dict(custom_is_provisional_po=po)
+	if not po or not cint(po.custom_is_provisional_po):
 		return False
-
-	return cint(frappe.db.get_value("Purchase Order", purchase_order, "custom_is_provisional_po"))
+	if cint(po.get("controlled_procurement")) and po.get("custom_lpo_type") == "Open":
+		return True
+	return bool(get_provisional_settings()["enabled"])
 
 
 def set_default_provisional_po(doc, method=None):
@@ -75,10 +86,6 @@ def on_purchase_receipt_submit(doc, method=None):
 def bump_provisional_po_qty_before_receipt(purchase_receipt):
 	"""Increase PO qty when PR qty exceeds pending qty for provisional POs."""
 	if frappe.flags.in_provisional_po_sync:
-		return
-
-	settings = get_provisional_settings()
-	if not settings["enabled"]:
 		return
 
 	po_updates: dict[str, list[dict]] = {}
