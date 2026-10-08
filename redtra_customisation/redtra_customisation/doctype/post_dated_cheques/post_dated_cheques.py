@@ -31,20 +31,37 @@ class PostDatedCheques(Document):
 			)
 
 	def before_cancel(self):
-		"""Cancel submitted Payment Entries linked to this PDC."""
+		"""Cancel only the Payment Entry explicitly linked to this PDC."""
+		payment_entry_name = self.payment_entry
+		if self.status == "Converted" and not payment_entry_name:
+			frappe.throw(
+				_("This converted PDC has no linked Payment Entry. Reconcile the link before cancelling it.")
+			)
+		if not payment_entry_name:
+			return
+
+		pe = frappe.get_doc("Payment Entry", payment_entry_name)
+		if (
+			pe.company != self.company
+			or pe.party_type != self.party_type
+			or pe.party != self.party
+			or pe.reference_no != self.reference_no
+		):
+			frappe.throw(
+				_("Linked Payment Entry {0} does not match this PDC. Reconcile the link before cancelling it.").format(
+					frappe.bold(payment_entry_name)
+				)
+			)
+
 		self._clear_payment_entry_link()
-		for payment_entry_name in self._get_linked_payment_entries():
-			if not frappe.db.exists("Payment Entry", payment_entry_name):
-				continue
-			pe = frappe.get_doc("Payment Entry", payment_entry_name)
-			if pe.docstatus != 1:
-				continue
-			# PDC still points to this PE until cancel completes; skip that back-link check.
+		if pe.docstatus == 1:
+			# The link was cleared above so the Payment Entry can be cancelled.
 			pe.flags.ignore_links = True
 			pe.cancel()
 
 	def on_cancel(self):
 		self._clear_payment_entry_link()
+		self.payment_entry_status = None
 		self.status = "Cancelled"
 		self.db_update()
 
@@ -147,28 +164,6 @@ class PostDatedCheques(Document):
 			update_modified=False,
 		)
 		self.payment_entry = None
-
-	def _get_linked_payment_entries(self):
-		linked = set()
-
-		if self.payment_entry:
-			linked.add(self.payment_entry)
-
-		# Fallback: include any PDC-generated entries matching this cheque details.
-		rows = frappe.get_all(
-			"Payment Entry",
-			filters={
-				"docstatus": ["in", [0, 1]],
-				"custom_is_pdc_entry": 1,
-				"company": self.company,
-				"party_type": self.party_type,
-				"party": self.party,
-				"reference_no": self.reference_no,
-			},
-			pluck="name",
-		)
-		linked.update(rows or [])
-		return list(linked)
 
 
 def _get_invoice_reference_no(reference_doctype, reference_name):

@@ -54,6 +54,9 @@ class IntegrationTestPostDatedCheques(IntegrationTestCase):
 		)
 		pe.insert()
 		pe.submit()
+		other_pe = frappe.copy_doc(pe)
+		other_pe.insert()
+		other_pe.submit()
 
 		pdc.db_set("payment_entry", pe.name, update_modified=False)
 		pdc.reload()
@@ -62,7 +65,10 @@ class IntegrationTestPostDatedCheques(IntegrationTestCase):
 
 		pdc.reload()
 		pe.reload()
+		other_pe.reload()
 		self.assertEqual(pdc.docstatus, 2)
 		self.assertEqual(pdc.status, "Cancelled")
 		self.assertIsNone(pdc.payment_entry)
+		self.assertIsNone(pdc.payment_entry_status)
 		self.assertEqual(pe.docstatus, 2)
+		self.assertEqual(other_pe.docstatus, 1)
