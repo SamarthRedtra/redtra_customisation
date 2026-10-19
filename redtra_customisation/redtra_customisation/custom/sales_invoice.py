@@ -6,7 +6,6 @@ from redtra_customisation.commission import (
 	get_project_commission_rate,
 	get_sales_invoice_commission_base_amount,
 )
-from redtra_customisation.paid_invoice_commission import should_defer_commission_to_payment
 
 # Module-level caches (per-request, cleared on bench restart)
 _NON_STOCK_ITEMS_CACHE = None
@@ -24,9 +23,8 @@ def calculate_profit_and_commission(doc, method):
 	# when updating after submit.
 	if doc.docstatus == 1:
 		return
-	# Project-wise commission is recorded when the invoice is fully paid.
-	if should_defer_commission_to_payment(doc):
-		return
+	# Always set SI commission fields from base_total on draft validate.
+	# Project-wise GL recording still waits until the invoice is fully paid.
 	calculate_commission(doc)
 
 

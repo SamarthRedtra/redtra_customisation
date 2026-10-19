@@ -31,6 +31,41 @@ class TestPaidInvoiceCommission(UnitTestCase):
 			get_sales_invoice_commission_base_amount(doc, force_total=True), 1000
 		)
 
+	def test_deferred_draft_validate_still_uses_base_total(self):
+		"""Project-wise defer must not leave Net Total on draft SI commission fields."""
+		from redtra_customisation.redtra_customisation.custom import sales_invoice as si_mod
+
+		doc = frappe._dict(
+			docstatus=0,
+			project="PROJ-1",
+			custom_enable_sales_based=0,
+			base_total=209745.43,
+			base_net_total=131348.43,
+			amount_eligible_for_commission=131348.43,
+			commission_rate=1,
+			total_commission=1313.48,
+			sales_team=[],
+		)
+		settings = frappe._dict(
+			enable_project_wise_commission=1,
+			use_markup_percentage_for_commission=0,
+			project_commission_slabs=[],
+			sales_partner_comssion_percentage=None,
+		)
+
+		with patch.object(si_mod, "calculate_profit_percentage"):
+			with patch("frappe.get_cached_doc", return_value=settings):
+				self.assertTrue(should_defer_commission_to_payment(doc))
+				with patch(
+					"redtra_customisation.redtra_customisation.custom.sales_invoice.get_project_commission_rate",
+					return_value=1.0,
+				):
+					si_mod.calculate_profit_and_commission(doc, None)
+
+		self.assertEqual(flt(doc.amount_eligible_for_commission), 209745.43)
+		self.assertNotEqual(flt(doc.amount_eligible_for_commission), flt(doc.base_net_total))
+		self.assertEqual(flt(doc.total_commission, 2), flt(209745.43 * 1.0 / 100.0, 2))
+
 	def test_should_defer_when_project_wise_enabled(self):
 		doc = frappe._dict(project="PROJ-1", custom_enable_sales_based=0)
 		settings = frappe._dict(enable_project_wise_commission=1)
