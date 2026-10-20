@@ -436,13 +436,19 @@ def calculate_commission(doc):
 	doc.total_commission = preview.get("total_commission")
 	_set_sales_partner_commission_fields(doc, preview)
 
-	row_by_name = {row.get("name"): row for row in preview.get("rows", []) if row.get("name")}
-	for row in doc.get("sales_team") or []:
-		updated_row = row_by_name.get(row.name)
+	preview_rows = preview.get("rows") or []
+	row_by_name = {row.get("name"): row for row in preview_rows if row.get("name")}
+	eligible = flt(preview.get("amount_eligible_for_commission"))
+	for idx, row in enumerate(doc.get("sales_team") or []):
+		updated_row = row_by_name.get(row.name) if row.get("name") else None
+		if not updated_row and idx < len(preview_rows):
+			updated_row = preview_rows[idx]
 		if not updated_row:
 			continue
 		row.commission_rate = updated_row.get("commission_rate")
 		row.incentives = updated_row.get("incentives")
+		allocated_pct = flt(row.get("allocated_percentage")) or 100.0
+		row.allocated_amount = flt(eligible * allocated_pct / 100.0)
 
 
 @frappe.whitelist()

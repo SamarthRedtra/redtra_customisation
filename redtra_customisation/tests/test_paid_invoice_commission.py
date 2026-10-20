@@ -35,6 +35,14 @@ class TestPaidInvoiceCommission(UnitTestCase):
 		"""Project-wise defer must not leave Net Total on draft SI commission fields."""
 		from redtra_customisation.redtra_customisation.custom import sales_invoice as si_mod
 
+		team_row = frappe._dict(
+			name="row-1",
+			sales_person="MUHAMMAD WAQAR",
+			allocated_percentage=100,
+			allocated_amount=131348.43,
+			commission_rate=1,
+			incentives=1313.48,
+		)
 		doc = frappe._dict(
 			docstatus=0,
 			project="PROJ-1",
@@ -44,7 +52,7 @@ class TestPaidInvoiceCommission(UnitTestCase):
 			amount_eligible_for_commission=131348.43,
 			commission_rate=1,
 			total_commission=1313.48,
-			sales_team=[],
+			sales_team=[team_row],
 		)
 		settings = frappe._dict(
 			enable_project_wise_commission=1,
@@ -65,6 +73,8 @@ class TestPaidInvoiceCommission(UnitTestCase):
 		self.assertEqual(flt(doc.amount_eligible_for_commission), 209745.43)
 		self.assertNotEqual(flt(doc.amount_eligible_for_commission), flt(doc.base_net_total))
 		self.assertEqual(flt(doc.total_commission, 2), flt(209745.43 * 1.0 / 100.0, 2))
+		self.assertEqual(flt(team_row.allocated_amount), 209745.43)
+		self.assertEqual(flt(team_row.incentives, 2), flt(209745.43 * 1.0 / 100.0, 2))
 
 	def test_should_defer_when_project_wise_enabled(self):
 		doc = frappe._dict(project="PROJ-1", custom_enable_sales_based=0)
